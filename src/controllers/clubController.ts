@@ -1,10 +1,13 @@
+// TODO MVP: This entire controller is commented out for MVP
+// Re-enable after MVP when Club model is active again
+/*
 import { Request, Response } from "express";
 import { Club } from "../models";
 
 export const getAllClubs = async (req: Request, res: Response) => {
   try {
     const clubs = await Club.findAll({
-      include: ["athletes"],
+      include: ["athletes", "testSessions"],
       order: [["created_at", "DESC"]],
     });
 
@@ -22,131 +25,43 @@ export const getAllClubs = async (req: Request, res: Response) => {
   }
 };
 
-export const getClubById = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
+... rest of file commented out for MVP ...
+*/
 
-    const club = await Club.findOne({
-      where: { id },
-      include: ["athletes"],
-    });
+import { Request, Response } from "express";
 
-    if (!club) {
-      return res.status(404).json({
-        success: false,
-        message: "Kulüp bulunamadı",
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      data: club,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Kulüp getirilirken hata oluştu",
-      error: error instanceof Error ? error.message : "Bilinmeyen hata",
-    });
-  }
+// Placeholder exports to prevent import errors
+export const getAllClubs = async (_req: Request, res: Response) => {
+  return res.status(503).json({
+    success: false,
+    message: "Club API is disabled for MVP",
+  });
 };
 
-export const createClub = async (req: Request, res: Response) => {
-  try {
-    const { name, city, contact_person, contact_email, contact_phone } =
-      req.body;
-
-    if (!name || !city) {
-      return res.status(400).json({
-        success: false,
-        message: "Kulüp adı ve şehir gerekli",
-      });
-    }
-
-    const club = await Club.create({
-      name,
-      city,
-      contact_person,
-      contact_email,
-      contact_phone,
-    });
-
-    return res.status(201).json({
-      success: true,
-      data: club,
-      message: "Kulüp başarıyla oluşturuldu",
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Kulüp oluşturulurken hata oluştu",
-      error: error instanceof Error ? error.message : "Bilinmeyen hata",
-    });
-  }
+export const getClubById = async (_req: Request, res: Response) => {
+  return res.status(503).json({
+    success: false,
+    message: "Club API is disabled for MVP",
+  });
 };
 
-export const updateClub = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { name, city, contact_person, contact_email, contact_phone } =
-      req.body;
-
-    const club = await Club.findOne({ where: { id } });
-
-    if (!club) {
-      return res.status(404).json({
-        success: false,
-        message: "Kulüp bulunamadı",
-      });
-    }
-
-    // Güncelle
-    if (name) club.name = name;
-    if (city) club.city = city;
-    if (contact_person) club.contact_person = contact_person;
-    if (contact_email) club.contact_email = contact_email;
-    if (contact_phone) club.contact_phone = contact_phone;
-
-    await club.save();
-
-    return res.status(200).json({
-      success: true,
-      data: club,
-      message: "Kulüp güncellendi",
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Kulüp güncellenirken hata oluştu",
-      error: error instanceof Error ? error.message : "Bilinmeyen hata",
-    });
-  }
+export const createClub = async (_req: Request, res: Response) => {
+  return res.status(503).json({
+    success: false,
+    message: "Club API is disabled for MVP",
+  });
 };
 
-export const deleteClub = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
+export const updateClub = async (_req: Request, res: Response) => {
+  return res.status(503).json({
+    success: false,
+    message: "Club API is disabled for MVP",
+  });
+};
 
-    const club = await Club.findOne({ where: { id } });
-
-    if (!club) {
-      return res.status(404).json({
-        success: false,
-        message: "Kulüp bulunamadı",
-      });
-    }
-
-    await club.destroy();
-
-    return res.status(200).json({
-      success: true,
-      message: "Kulüp silindi",
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Kulüp silinirken hata oluştu",
-      error: error instanceof Error ? error.message : "Bilinmeyen hata",
-    });
-  }
+export const deleteClub = async (_req: Request, res: Response) => {
+  return res.status(503).json({
+    success: false,
+    message: "Club API is disabled for MVP",
+  });
 };

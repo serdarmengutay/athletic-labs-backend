@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import { Coach } from "../models";
+// TODO MVP: Coach model is commented out, import directly from file for auth functionality
+import Coach from "../models/Coach";
 
 interface AuthRequest extends Request {
   coach?: any;
@@ -44,6 +45,8 @@ export const authenticateCoach = async (
   }
 };
 
+// TODO MVP: commented out role-based station access
+/*
 export const requireStationAccess = (stationId: string) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.coach) {
@@ -72,3 +75,4 @@ export const requireStationAccess = (stationId: string) => {
     });
   };
 };
+*/

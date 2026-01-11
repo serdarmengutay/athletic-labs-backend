@@ -1,7 +1,9 @@
+// TODO MVP: This controller uses old Coach model for auth
+// Using direct import from Coach.ts instead of index.ts
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { Coach } from "../models";
+import Coach from "../models/Coach";
 
 export const coachLogin = async (req: Request, res: Response) => {
   try {
@@ -14,7 +16,6 @@ export const coachLogin = async (req: Request, res: Response) => {
       });
     }
 
-    // Hoca bilgilerini getir
     const coach = await Coach.findOne({ where: { email } });
 
     if (!coach) {
@@ -24,25 +25,19 @@ export const coachLogin = async (req: Request, res: Response) => {
       });
     }
 
-    // Şifre kontrolü
-    const isPasswordValid = await bcrypt.compare(password, coach.password_hash);
+    const isValidPassword = await bcrypt.compare(password, coach.password_hash);
 
-    if (!isPasswordValid) {
+    if (!isValidPassword) {
       return res.status(401).json({
         success: false,
         message: "Geçersiz email veya şifre",
       });
     }
 
-    // JWT token oluştur
     const token = jwt.sign(
-      {
-        coachId: coach.id,
-        email: coach.email,
-        role: coach.role,
-      },
+      { coachId: coach.id },
       process.env.JWT_SECRET || "default-secret",
-      { expiresIn: "8h" }
+      { expiresIn: "24h" }
     );
 
     return res.status(200).json({
@@ -75,13 +70,11 @@ export const createCoach = async (req: Request, res: Response) => {
     if (!name || !email || !password || !role) {
       return res.status(400).json({
         success: false,
-        message: "Ad, email, şifre ve rol gerekli",
+        message: "İsim, email, şifre ve rol gerekli",
       });
     }
 
-    // Email zaten var mı kontrol et
     const existingCoach = await Coach.findOne({ where: { email } });
-
     if (existingCoach) {
       return res.status(400).json({
         success: false,
@@ -89,11 +82,8 @@ export const createCoach = async (req: Request, res: Response) => {
       });
     }
 
-    // Şifreyi hashle
-    const saltRounds = 10;
-    const password_hash = await bcrypt.hash(password, saltRounds);
+    const password_hash = await bcrypt.hash(password, 10);
 
-    // Hoca oluştur
     const coach = await Coach.create({
       name,
       email,
@@ -102,7 +92,40 @@ export const createCoach = async (req: Request, res: Response) => {
       assigned_stations: assigned_stations || [],
     });
 
+    const token = jwt.sign(
+      { coachId: coach.id },
+      process.env.JWT_SECRET || "default-secret",
+      { expiresIn: "24h" }
+    );
+
     return res.status(201).json({
+      success: true,
+      data: {
+        token,
+        coach: {
+          id: coach.id,
+          name: coach.name,
+          email: coach.email,
+          role: coach.role,
+          assigned_stations: coach.assigned_stations,
+        },
+      },
+      message: "Kayıt başarılı",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Kayıt yapılırken hata oluştu",
+      error: error instanceof Error ? error.message : "Bilinmeyen hata",
+    });
+  }
+};
+
+export const getCoachProfile = async (req: any, res: Response) => {
+  try {
+    const coach = req.coach;
+
+    return res.status(200).json({
       success: true,
       data: {
         id: coach.id,
@@ -111,75 +134,21 @@ export const createCoach = async (req: Request, res: Response) => {
         role: coach.role,
         assigned_stations: coach.assigned_stations,
       },
-      message: "Hoca başarıyla oluşturuldu",
     });
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: "Hoca oluşturulurken hata oluştu",
+      message: "Profil getirilirken hata oluştu",
       error: error instanceof Error ? error.message : "Bilinmeyen hata",
     });
   }
 };
 
-export const getCoachProfile = async (req: Request, res: Response) => {
+export const updateCoachProfile = async (req: any, res: Response) => {
   try {
-    const coachId = (req as any).coach?.id;
-
-    if (!coachId) {
-      return res.status(401).json({
-        success: false,
-        message: "Kimlik doğrulama gerekli",
-      });
-    }
-
-    const coach = await Coach.findOne({
-      where: { id: coachId },
-      attributes: { exclude: ["password_hash"] },
-    });
-
-    if (!coach) {
-      return res.status(404).json({
-        success: false,
-        message: "Hoca bulunamadı",
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      data: coach,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Profil bilgileri getirilirken hata oluştu",
-      error: error instanceof Error ? error.message : "Bilinmeyen hata",
-    });
-  }
-};
-
-export const updateCoachProfile = async (req: Request, res: Response) => {
-  try {
-    const coachId = (req as any).coach?.id;
+    const coach = req.coach;
     const { name, assigned_stations } = req.body;
 
-    if (!coachId) {
-      return res.status(401).json({
-        success: false,
-        message: "Kimlik doğrulama gerekli",
-      });
-    }
-
-    const coach = await Coach.findOne({ where: { id: coachId } });
-
-    if (!coach) {
-      return res.status(404).json({
-        success: false,
-        message: "Hoca bulunamadı",
-      });
-    }
-
-    // Güncelle
     if (name) coach.name = name;
     if (assigned_stations) coach.assigned_stations = assigned_stations;
 

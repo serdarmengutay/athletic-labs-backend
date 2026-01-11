@@ -1,12 +1,18 @@
 import { DataTypes, Model, Optional } from "sequelize";
 import sequelize from "../config/database";
 
+// TODO MVP: Refactored for MVP - removed club_id reference, added inline club info
 interface TestSessionAttributes {
   id: string;
-  club_id: string;
+  club_name: string;
+  club_responsible_name: string;
+  club_responsible_email: string | null;
+  club_responsible_phone: string | null;
+  city: string;
+  sport_type: string;
   test_date: Date;
-  status: "preparing" | "active" | "completed" | "cancelled";
-  notes: string;
+  status: "draft" | "in_progress" | "completed";
+  notes: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -14,7 +20,13 @@ interface TestSessionAttributes {
 interface TestSessionCreationAttributes
   extends Optional<
     TestSessionAttributes,
-    "id" | "status" | "notes" | "created_at" | "updated_at"
+    | "id"
+    | "club_responsible_email"
+    | "club_responsible_phone"
+    | "status"
+    | "notes"
+    | "created_at"
+    | "updated_at"
   > {}
 
 class TestSession
@@ -22,10 +34,15 @@ class TestSession
   implements TestSessionAttributes
 {
   public id!: string;
-  public club_id!: string;
+  public club_name!: string;
+  public club_responsible_name!: string;
+  public club_responsible_email!: string | null;
+  public club_responsible_phone!: string | null;
+  public city!: string;
+  public sport_type!: string;
   public test_date!: Date;
-  public status!: "preparing" | "active" | "completed" | "cancelled";
-  public notes!: string;
+  public status!: "draft" | "in_progress" | "completed";
+  public notes!: string | null;
   public readonly created_at!: Date;
   public readonly updated_at!: Date;
 }
@@ -37,22 +54,38 @@ TestSession.init(
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
-    club_id: {
-      type: DataTypes.UUID,
+    club_name: {
+      type: DataTypes.STRING(255),
       allowNull: false,
-      references: {
-        model: "clubs",
-        key: "id",
-      },
+    },
+    club_responsible_name: {
+      type: DataTypes.STRING(255),
+      allowNull: false,
+    },
+    club_responsible_email: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+    },
+    club_responsible_phone: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+    },
+    city: {
+      type: DataTypes.STRING(100),
+      allowNull: false,
+    },
+    sport_type: {
+      type: DataTypes.STRING(100),
+      allowNull: false,
     },
     test_date: {
       type: DataTypes.DATE,
       allowNull: false,
     },
     status: {
-      type: DataTypes.ENUM("preparing", "active", "completed", "cancelled"),
+      type: DataTypes.ENUM("draft", "in_progress", "completed"),
       allowNull: false,
-      defaultValue: "preparing",
+      defaultValue: "draft",
     },
     notes: {
       type: DataTypes.TEXT,

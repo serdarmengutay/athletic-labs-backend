@@ -1,8 +1,16 @@
 import sequelize from "../config/database";
 import {
-  Club,
-  Athlete,
   TestSession,
+  Athlete,
+  AthleteTest,
+  Measurement,
+  HistoricalAthleteData,
+} from "../models";
+
+// TODO MVP: Commented out old models
+/*
+import {
+  Club,
   TestResult,
   PercentileResult,
   Coach,
@@ -10,6 +18,7 @@ import {
   Station,
   StationTestResult,
 } from "../models";
+*/
 
 const syncDatabase = async () => {
   try {
@@ -23,131 +32,109 @@ const syncDatabase = async () => {
 
     console.log("🔄 Test verisi ekleniyor...");
 
-    // Test kulübü oluştur
-    const testClub = await Club.create({
-      name: "Test Kulübü",
-      city: "İstanbul",
-      contact_person: "Ahmet Yılmaz",
-      contact_email: "ahmet@test.com",
-      contact_phone: "0532 123 45 67",
-    });
-
-    // Demo hesapları oluştur
-    const demoCoaches = [
-      {
-        name: "FFMI İstasyonu",
-        email: "ffmi@demo.com",
-        password: "demo123",
-        role: "station_coach" as const,
-        assigned_stations: ["Boy-Kilo-FFMI-Esneklik İstasyonu"],
-      },
-      {
-        name: "Sprint İstasyonu",
-        email: "sprint@demo.com",
-        password: "demo123",
-        role: "station_coach" as const,
-        assigned_stations: ["30 Metre Koşu İstasyonu"],
-      },
-      {
-        name: "Yönetici",
-        email: "admin@demo.com",
-        password: "admin123",
-        role: "admin" as const,
-        assigned_stations: [],
-      },
-    ];
-
-    for (const coachData of demoCoaches) {
-      const bcrypt = require("bcryptjs");
-      const password_hash = await bcrypt.hash(coachData.password, 10);
-      await Coach.findOrCreate({
-        where: { email: coachData.email },
-        defaults: {
-          name: coachData.name,
-          email: coachData.email,
-          password_hash: password_hash,
-          role: coachData.role,
-          assigned_stations: coachData.assigned_stations,
-        },
-      });
-    }
-
-    // Test hocası oluştur
-    const bcrypt = require("bcryptjs");
-    const testCoach = await Coach.create({
-      name: "Test Hocası",
-      email: "hoca@test.com",
-      password_hash: await bcrypt.hash("123456", 10),
-      role: "admin",
-      assigned_stations: [
-        "ffmi-station",
-        "sprint-30m",
-        "vertical-jump",
-        "agility",
-        "flexibility",
-      ],
-    });
-
-    // Test sporcusu oluştur
-    const testAthlete = await Athlete.create({
-      first_name: "Test",
-      last_name: "Sporcu",
-      birth_year: 2000,
-      height: 180,
-      weight: 75,
-      bmi: 23.15,
-      ffmi: 20.5,
-      club_id: testClub.id,
-      athlete_code: "200000001",
-    });
-
-    // Test oturumu oluştur
+    // Test oturumu oluştur (MVP: inline club info)
     const testSession = await TestSession.create({
-      club_id: testClub.id,
+      club_name: "Test Kulübü",
+      club_responsible_name: "Ahmet Yılmaz",
+      club_responsible_email: "ahmet@test.com",
+      club_responsible_phone: "0532 123 45 67",
+      city: "İstanbul",
+      sport_type: "Futbol",
       test_date: new Date(),
-      status: "active",
+      status: "draft",
       notes: "Test oturumu",
     });
 
-    // İstasyonları oluştur
-    const stations = [
+    // Test sporcusu oluştur (MVP: simplified)
+    const testAthlete = await Athlete.create({
+      full_name: "Test Sporcu",
+      birth_year: 2010,
+      birth_date: new Date("2010-05-15"),
+    });
+
+    // AthleteTest oluştur
+    const athleteTest = await AthleteTest.create({
+      test_session_id: testSession.id,
+      athlete_id: testAthlete.id,
+      is_completed: false,
+    });
+
+    // Measurement oluştur
+    await Measurement.create({
+      athlete_test_id: athleteTest.id,
+      height: 145,
+      weight: 38,
+      flexibility: 12,
+      sprint_30m: 5.2,
+      sprint_30m_second: 5.1,
+      agility: 11.5,
+      vertical_jump: 32,
+    });
+
+    // Örnek historical data ekle
+    const historicalData = [
       {
-        name: "Boy-Kilo-FFMI-Esneklik İstasyonu",
-        description:
-          "Sporcunun boy, kilo, FFMI ve esneklik ölçümlerinin yapıldığı istasyon",
-        metrics: ["height", "weight", "flexibility"],
+        birth_year: 2010,
+        height: 140,
+        weight: 35,
+        flexibility: 10,
+        sprint_30m: 5.5,
+        sprint_30m_second: 5.4,
+        agility: 12.0,
+        vertical_jump: 28,
       },
       {
-        name: "30 Metre Koşu İstasyonu",
-        description:
-          "Sporcunun 30 metre koşu testlerinin yapıldığı istasyon (iki koşu)",
-        metrics: ["sprint_30m_first", "sprint_30m_second"],
+        birth_year: 2010,
+        height: 142,
+        weight: 37,
+        flexibility: 11,
+        sprint_30m: 5.3,
+        sprint_30m_second: 5.2,
+        agility: 11.8,
+        vertical_jump: 30,
       },
       {
-        name: "Çeviklik İstasyonu",
-        description: "Sporcunun çeviklik testinin yapıldığı istasyon",
-        metrics: ["agility"],
+        birth_year: 2010,
+        height: 145,
+        weight: 38,
+        flexibility: 12,
+        sprint_30m: 5.2,
+        sprint_30m_second: 5.1,
+        agility: 11.5,
+        vertical_jump: 32,
       },
       {
-        name: "Dikey Sıçrama İstasyonu",
-        description: "Sporcunun dikey sıçrama testinin yapıldığı istasyon",
-        metrics: ["vertical_jump"],
+        birth_year: 2011,
+        height: 138,
+        weight: 33,
+        flexibility: 9,
+        sprint_30m: 5.7,
+        sprint_30m_second: 5.6,
+        agility: 12.5,
+        vertical_jump: 25,
+      },
+      {
+        birth_year: 2011,
+        height: 140,
+        weight: 35,
+        flexibility: 10,
+        sprint_30m: 5.5,
+        sprint_30m_second: 5.4,
+        agility: 12.2,
+        vertical_jump: 27,
       },
     ];
 
-    for (const stationData of stations) {
-      await Station.create(stationData);
+    for (const data of historicalData) {
+      await HistoricalAthleteData.create(data);
     }
 
     console.log("✅ Test verileri eklendi!");
     console.log(`📊 Oluşturulan veriler:`);
-    console.log(`   - Kulüp: ${testClub.name}`);
-    console.log(`   - Hoca: ${testCoach.name} (${testCoach.email})`);
-    console.log(
-      `   - Sporcu: ${testAthlete.first_name} ${testAthlete.last_name} (${testAthlete.athlete_code})`
-    );
-    console.log(`   - Oturum: ${testSession.id}`);
-    console.log(`   - İstasyonlar: ${stations.length} adet oluşturuldu`);
+    console.log(`   - Test Oturumu: ${testSession.id}`);
+    console.log(`   - Sporcu: ${testAthlete.full_name}`);
+    console.log(`   - AthleteTest: ${athleteTest.id}`);
+    console.log(`   - Historical Data: ${historicalData.length} adet`);
 
     process.exit(0);
   } catch (error) {

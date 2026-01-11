@@ -1,24 +1,16 @@
+// TODO MVP: Excel routes disabled for MVP
 import { Router } from "express";
 import {
-  importAthletesFromExcel,
-  downloadExcelTemplate,
-  exportAthletesToExcel,
-  upload,
+  uploadAthletes,
+  downloadAthletes,
+  downloadSampleTemplate,
 } from "../controllers/excelController";
 
 const router = Router();
 
-// Excel dosyasından sporcu listesi import et
-router.post(
-  "/import-athletes",
-  upload.single("excelFile"),
-  importAthletesFromExcel
-);
-
-// Excel template indir
-router.get("/template", downloadExcelTemplate);
-
-// Kulüp sporcularını Excel olarak export et
-router.get("/export-athletes/:clubId/:sessionId", exportAthletesToExcel);
+// TODO MVP: All Excel endpoints disabled
+router.post("/import-athletes", uploadAthletes);
+router.get("/template", downloadSampleTemplate);
+router.get("/export-athletes/:clubId/:sessionId", downloadAthletes);
 
 export default router;

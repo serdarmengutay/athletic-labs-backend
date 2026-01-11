@@ -1,20 +1,42 @@
+// TODO MVP: Test controller simplified for MVP
+// Using new TestSession with inline club info
 import { Request, Response } from "express";
-import { TestSession, TestResult, PercentileResult, Athlete } from "../models";
-import {
-  calculateFatigueIndex,
-  calculatePercentile,
-  calculateScore,
-  calculateOverallScore,
-  getAgeGroup,
-  getBirthYear,
-} from "../utils/calculations";
+import { TestSession, Athlete, AthleteTest, Measurement } from "../models";
 
 export const createTestSession = async (req: Request, res: Response) => {
   try {
-    const { club_id, test_date, notes } = req.body;
+    const {
+      club_name,
+      club_responsible_name,
+      club_responsible_email,
+      club_responsible_phone,
+      city,
+      sport_type,
+      test_date,
+      notes,
+    } = req.body;
+
+    if (
+      !club_name ||
+      !club_responsible_name ||
+      !city ||
+      !sport_type ||
+      !test_date
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Kulüp adı, sorumlu adı, şehir, spor tipi ve test tarihi gerekli",
+      });
+    }
 
     const testSession = await TestSession.create({
-      club_id,
+      club_name,
+      club_responsible_name,
+      club_responsible_email,
+      club_responsible_phone,
+      city,
+      sport_type,
       test_date: new Date(test_date),
       notes,
     });
@@ -33,27 +55,120 @@ export const createTestSession = async (req: Request, res: Response) => {
   }
 };
 
-export const addTestResult = async (req: Request, res: Response) => {
+export const getAllTestSessions = async (_req: Request, res: Response) => {
   try {
-    const {
-      athlete_id,
-      test_session_id,
-      flexibility,
-      sprint_30m_first,
-      sprint_30m_second,
-      agility,
-      vertical_jump,
-      ffmi,
-    } = req.body;
-
-    console.log("Test result request body:", req.body);
-
-    // Sporcu bilgilerini al (önce athlete'ı bulalım)
-    console.log("Aranan athlete_id:", athlete_id);
-    const athlete = await Athlete.findOne({
-      where: { id: athlete_id },
+    const testSessions = await TestSession.findAll({
+      include: [
+        {
+          association: "athleteTests",
+          include: [{ association: "athlete" }, { association: "measurement" }],
+        },
+      ],
+      order: [["test_date", "DESC"]],
     });
-    console.log("Bulunan athlete:", athlete);
+
+    return res.status(200).json({
+      success: true,
+      data: testSessions,
+      count: testSessions.length,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Test oturumları getirilirken hata oluştu",
+      error: error instanceof Error ? error.message : "Bilinmeyen hata",
+    });
+  }
+};
+
+export const getTestSessionById = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const testSession = await TestSession.findOne({
+      where: { id },
+      include: [
+        {
+          association: "athleteTests",
+          include: [{ association: "athlete" }, { association: "measurement" }],
+        },
+      ],
+    });
+
+    if (!testSession) {
+      return res.status(404).json({
+        success: false,
+        message: "Test oturumu bulunamadı",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: testSession,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Test oturumu getirilirken hata oluştu",
+      error: error instanceof Error ? error.message : "Bilinmeyen hata",
+    });
+  }
+};
+
+export const updateTestSessionStatus = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    const testSession = await TestSession.findOne({ where: { id } });
+
+    if (!testSession) {
+      return res.status(404).json({
+        success: false,
+        message: "Test oturumu bulunamadı",
+      });
+    }
+
+    if (!["draft", "in_progress", "completed"].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Geçersiz durum değeri",
+      });
+    }
+
+    testSession.status = status;
+    await testSession.save();
+
+    return res.status(200).json({
+      success: true,
+      data: testSession,
+      message: "Test oturumu durumu güncellendi",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Test oturumu güncellenirken hata oluştu",
+      error: error instanceof Error ? error.message : "Bilinmeyen hata",
+    });
+  }
+};
+
+export const addAthleteToSession = async (req: Request, res: Response) => {
+  try {
+    const { test_session_id, athlete_id } = req.body;
+
+    const testSession = await TestSession.findOne({
+      where: { id: test_session_id },
+    });
+    const athlete = await Athlete.findOne({ where: { id: athlete_id } });
+
+    if (!testSession) {
+      return res.status(404).json({
+        success: false,
+        message: "Test oturumu bulunamadı",
+      });
+    }
+
     if (!athlete) {
       return res.status(404).json({
         success: false,
@@ -61,287 +176,139 @@ export const addTestResult = async (req: Request, res: Response) => {
       });
     }
 
-    // Yorgunluk endeksi hesapla
-    const fatigue_index = calculateFatigueIndex(
-      sprint_30m_first,
-      sprint_30m_second
-    );
+    // Check if athlete already in session
+    const existingAthleteTest = await AthleteTest.findOne({
+      where: { test_session_id, athlete_id },
+    });
 
-    // Test sonucunu kaydet
-    const testResult = await TestResult.create({
-      athlete_id,
+    if (existingAthleteTest) {
+      return res.status(400).json({
+        success: false,
+        message: "Sporcu zaten bu oturumda",
+      });
+    }
+
+    const athleteTest = await AthleteTest.create({
       test_session_id,
-      flexibility,
-      sprint_30m_first,
-      sprint_30m_second,
-      fatigue_index,
-      agility,
-      vertical_jump,
-      ffmi,
-    });
-
-    // Aynı doğum yılındaki tüm sporcuları al
-    const birthYear = getBirthYear(athlete.birth_year);
-    const ageGroupAthletes = await Athlete.findAll({
-      where: {
-        birth_year: birthYear,
-      },
-      include: ["testResults"],
-    });
-
-    // Yüzdelik dilimleri hesapla
-    const percentiles = await calculatePercentiles(
-      testResult,
-      athlete,
-      ageGroupAthletes
-    );
-
-    // Yüzdelik sonuçlarını kaydet
-    const percentileResult = await PercentileResult.create({
       athlete_id,
-      test_result_id: testResult.id,
-      age_group: getAgeGroup(athlete.birth_year),
-      height_percentile: percentiles.height_percentile,
-      weight_percentile: percentiles.weight_percentile,
-      bmi_percentile: percentiles.bmi_percentile,
-      ffmi_percentile: percentiles.ffmi_percentile,
-      flexibility_percentile: percentiles.flexibility_percentile,
-      sprint_30m_first_percentile: percentiles.sprint_30m_first_percentile,
-      sprint_30m_second_percentile: percentiles.sprint_30m_second_percentile,
-      fatigue_index_percentile: percentiles.fatigue_index_percentile,
-      agility_percentile: percentiles.agility_percentile,
-      vertical_jump_percentile: percentiles.vertical_jump_percentile,
-      overall_percentile: percentiles.overall_percentile,
-      // Puanları da kaydet
-      height_score: percentiles.height_score,
-      weight_score: percentiles.weight_score,
-      bmi_score: percentiles.bmi_score,
-      ffmi_score: percentiles.ffmi_score,
-      flexibility_score: percentiles.flexibility_score,
-      sprint_30m_first_score: percentiles.sprint_30m_first_score,
-      sprint_30m_second_score: percentiles.sprint_30m_second_score,
-      fatigue_index_score: percentiles.fatigue_index_score,
-      agility_score: percentiles.agility_score,
-      vertical_jump_score: percentiles.vertical_jump_score,
+    });
+
+    // Create empty measurement
+    await Measurement.create({
+      athlete_test_id: athleteTest.id,
     });
 
     return res.status(201).json({
       success: true,
-      data: {
-        testResult,
-        percentileResult,
-      },
-      message: "Test sonucu başarıyla eklendi",
+      data: athleteTest,
+      message: "Sporcu oturuma eklendi",
     });
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: "Test sonucu eklenirken hata oluştu",
+      message: "Sporcu oturuma eklenirken hata oluştu",
       error: error instanceof Error ? error.message : "Bilinmeyen hata",
     });
   }
 };
 
-export const getAthleteTestHistory = async (req: Request, res: Response) => {
+export const saveMeasurement = async (req: Request, res: Response) => {
   try {
-    const { athlete_id } = req.params;
+    const { athlete_test_id, ...measurementData } = req.body;
 
-    const athlete = await Athlete.findOne({
-      where: { id: athlete_id },
-      include: [
-        {
-          association: "testResults",
-          include: ["testSession", "percentileResult"],
-          order: [["created_at", "DESC"]],
-        },
-      ],
+    const athleteTest = await AthleteTest.findOne({
+      where: { id: athlete_test_id },
+      include: [{ association: "measurement" }],
     });
 
-    if (!athlete) {
+    if (!athleteTest) {
       return res.status(404).json({
         success: false,
-        message: "Sporcu bulunamadı",
+        message: "Sporcu testi bulunamadı",
       });
+    }
+
+    // Find or create measurement
+    let measurement = await Measurement.findOne({
+      where: { athlete_test_id },
+    });
+
+    if (!measurement) {
+      measurement = await Measurement.create({
+        athlete_test_id,
+        ...measurementData,
+      });
+    } else {
+      // Update existing measurement
+      await measurement.update(measurementData);
     }
 
     return res.status(200).json({
       success: true,
-      data: athlete,
+      data: measurement,
+      message: "Ölçüm kaydedildi",
     });
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: "Test geçmişi getirilirken hata oluştu",
+      message: "Ölçüm kaydedilirken hata oluştu",
       error: error instanceof Error ? error.message : "Bilinmeyen hata",
     });
   }
 };
 
-export const getAllTestSessions = async (req: Request, res: Response) => {
+export const completeAthleteTest = async (req: Request, res: Response) => {
   try {
-    const testSessions = await TestSession.findAll({
-      include: [
-        "club",
-        {
-          association: "testResults",
-          include: ["athlete", "percentileResult"],
-        },
-      ],
-      order: [["test_date", "DESC"]],
+    const { athlete_test_id } = req.body;
+
+    const athleteTest = await AthleteTest.findOne({
+      where: { id: athlete_test_id },
     });
+
+    if (!athleteTest) {
+      return res.status(404).json({
+        success: false,
+        message: "Sporcu testi bulunamadı",
+      });
+    }
+
+    athleteTest.is_completed = true;
+    athleteTest.completed_at = new Date();
+    await athleteTest.save();
 
     return res.status(200).json({
       success: true,
-      data: testSessions,
-      count: testSessions.length,
+      data: athleteTest,
+      message: "Sporcu testi tamamlandı",
     });
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: "Test oturumları getirilirken hata oluştu",
+      message: "Sporcu testi tamamlanırken hata oluştu",
       error: error instanceof Error ? error.message : "Bilinmeyen hata",
     });
   }
 };
 
-export const getClubTestSessions = async (req: Request, res: Response) => {
-  try {
-    const { club_id } = req.params;
-
-    const testSessions = await TestSession.findAll({
-      where: { club_id },
-      include: [
-        "club",
-        {
-          association: "testResults",
-          include: ["athlete", "percentileResult"],
-        },
-      ],
-      order: [["test_date", "DESC"]],
-    });
-
-    return res.status(200).json({
-      success: true,
-      data: testSessions,
-      count: testSessions.length,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Test oturumları getirilirken hata oluştu",
-      error: error instanceof Error ? error.message : "Bilinmeyen hata",
-    });
-  }
+// TODO MVP: Legacy endpoints disabled
+export const addTestResult = async (_req: Request, res: Response) => {
+  return res.status(503).json({
+    success: false,
+    message:
+      "Legacy addTestResult is disabled for MVP. Use saveMeasurement instead.",
+  });
 };
 
-// Yardımcı fonksiyon: Yüzdelik dilimleri hesapla
-async function calculatePercentiles(
-  testResult: any,
-  athlete: any,
-  ageGroupAthletes: any[]
-) {
-  // Tüm yaş grubundaki test sonuçlarını al
-  const allTestResults = [];
-  for (const athlete of ageGroupAthletes) {
-    allTestResults.push(...athlete.testResults);
-  }
+export const getAthleteTestHistory = async (_req: Request, res: Response) => {
+  return res.status(503).json({
+    success: false,
+    message: "Legacy getAthleteTestHistory is disabled for MVP",
+  });
+};
 
-  // Her parametre için yüzdelik dilim hesapla
-  const heightValues = ageGroupAthletes.map((a) => a.height);
-  const weightValues = ageGroupAthletes.map((a) => a.weight);
-  const bmiValues = ageGroupAthletes.map((a) => a.bmi);
-  const ffmiValues = ageGroupAthletes.map((a) => a.ffmi);
-  const flexibilityValues = allTestResults.map((tr) => tr.flexibility);
-  const sprintFirstValues = allTestResults.map((tr) => tr.sprint_30m_first);
-  const sprintSecondValues = allTestResults.map((tr) => tr.sprint_30m_second);
-  const fatigueValues = allTestResults.map((tr) => tr.fatigue_index);
-  const agilityValues = allTestResults.map((tr) => tr.agility);
-  const verticalJumpValues = allTestResults.map((tr) => tr.vertical_jump);
-
-  // Yüzdelik dilimleri hesapla
-  const height_percentile = calculatePercentile(athlete.height, heightValues);
-  const weight_percentile = calculatePercentile(athlete.weight, weightValues);
-  const bmi_percentile = calculatePercentile(athlete.bmi, bmiValues);
-  const ffmi_percentile = calculatePercentile(athlete.ffmi, ffmiValues);
-  const flexibility_percentile = calculatePercentile(
-    testResult.flexibility,
-    flexibilityValues
-  );
-  const sprint_30m_first_percentile = calculatePercentile(
-    testResult.sprint_30m_first,
-    sprintFirstValues,
-    true
-  );
-  const sprint_30m_second_percentile = calculatePercentile(
-    testResult.sprint_30m_second,
-    sprintSecondValues,
-    true
-  );
-  const fatigue_index_percentile = calculatePercentile(
-    testResult.fatigue_index,
-    fatigueValues,
-    true
-  );
-  const agility_percentile = calculatePercentile(
-    testResult.agility,
-    agilityValues,
-    true
-  );
-  const vertical_jump_percentile = calculatePercentile(
-    testResult.vertical_jump,
-    verticalJumpValues
-  );
-
-  // Her parametre için puan hesapla (100 - yüzdelik dilim)
-  const height_score = calculateScore(height_percentile);
-  const weight_score = calculateScore(weight_percentile);
-  const bmi_score = calculateScore(bmi_percentile);
-  const ffmi_score = calculateScore(ffmi_percentile);
-  const flexibility_score = calculateScore(flexibility_percentile);
-  const sprint_30m_first_score = calculateScore(sprint_30m_first_percentile);
-  const sprint_30m_second_score = calculateScore(sprint_30m_second_percentile);
-  const fatigue_index_score = calculateScore(fatigue_index_percentile);
-  const agility_score = calculateScore(agility_percentile);
-  const vertical_jump_score = calculateScore(vertical_jump_percentile);
-
-  // Genel performans puanı hesapla
-  const scores = [
-    height_score,
-    weight_score,
-    bmi_score,
-    ffmi_score,
-    flexibility_score,
-    sprint_30m_first_score,
-    sprint_30m_second_score,
-    fatigue_index_score,
-    agility_score,
-    vertical_jump_score,
-  ];
-
-  const overall_percentile = calculateOverallScore(scores);
-
-  return {
-    height_percentile,
-    weight_percentile,
-    bmi_percentile,
-    ffmi_percentile,
-    flexibility_percentile,
-    sprint_30m_first_percentile,
-    sprint_30m_second_percentile,
-    fatigue_index_percentile,
-    agility_percentile,
-    vertical_jump_percentile,
-    overall_percentile,
-    // Puanları da döndür
-    height_score,
-    weight_score,
-    bmi_score,
-    ffmi_score,
-    flexibility_score,
-    sprint_30m_first_score,
-    sprint_30m_second_score,
-    fatigue_index_score,
-    agility_score,
-    vertical_jump_score,
-  };
-}
+export const getClubTestSessions = async (_req: Request, res: Response) => {
+  return res.status(503).json({
+    success: false,
+    message: "Legacy getClubTestSessions is disabled for MVP",
+  });
+};

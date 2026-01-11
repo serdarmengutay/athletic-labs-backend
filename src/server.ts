@@ -6,18 +6,27 @@ import compression from "compression";
 import dotenv from "dotenv";
 import sequelize from "./config/database";
 
+// Load environment variables (must be before Firebase import)
+dotenv.config();
+
+// Firebase Auth Middleware
+import { authenticateFirebase } from "./middleware/firebaseAuth";
+
 // Import routes
 import clubRoutes from "./routes/clubs";
 import athleteRoutes from "./routes/athletes";
 import testRoutes from "./routes/tests";
-import qrRoutes from "./routes/qr";
-import stationRoutes from "./routes/station";
+// MVP CRUD routes
+import testSessionRoutes from "./routes/testSessions";
+import athleteTestRoutes from "./routes/athleteTests";
+import historicalAthletesRoutes from "./routes/historicalAthletes";
+import historicalTestsRoutes from "./routes/historicalTests";
+// TODO MVP: commented out QR / station auth
+// import qrRoutes from "./routes/qr";
+// import stationRoutes from "./routes/station";
 import authRoutes from "./routes/auth";
 import excelRoutes from "./routes/excel";
 import coachRoutes from "./routes/coaches";
-
-// Load environment variables
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5017;
@@ -44,7 +53,7 @@ app.use(morgan("combined"));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-// Health check endpoint
+// Health check endpoint (public - no auth required)
 app.get("/health", (req: Request, res: Response) => {
   res.status(200).json({
     status: "OK",
@@ -53,7 +62,7 @@ app.get("/health", (req: Request, res: Response) => {
   });
 });
 
-// API routes
+// API info endpoint (public - no auth required)
 app.get("/api", (req: Request, res: Response) => {
   res.json({
     message: "Athletic Labs API",
@@ -62,12 +71,23 @@ app.get("/api", (req: Request, res: Response) => {
   });
 });
 
-// Route handlers
+// Apply Firebase auth middleware to all /api/* routes
+// TODO: Add role/permission checks here when needed
+app.use("/api", authenticateFirebase);
+
+// Route handlers (all protected by Firebase auth)
+// MVP CRUD routes
+app.use("/api/test-sessions", testSessionRoutes);
+app.use("/api/athlete-tests", athleteTestRoutes);
+app.use("/api/historical-athletes", historicalAthletesRoutes);
+app.use("/api/historical-tests", historicalTestsRoutes);
+// Legacy routes (will be deprecated)
 app.use("/api/clubs", clubRoutes);
 app.use("/api/athletes", athleteRoutes);
 app.use("/api/tests", testRoutes);
-app.use("/api/qr", qrRoutes);
-app.use("/api/station", stationRoutes);
+// TODO MVP: commented out QR / station auth
+// app.use("/api/qr", qrRoutes);
+// app.use("/api/station", stationRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/excel", excelRoutes);
 app.use("/api/coaches", coachRoutes);

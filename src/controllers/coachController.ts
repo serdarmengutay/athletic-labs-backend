@@ -1,9 +1,10 @@
+// TODO MVP: This controller uses old Coach/role model
+// Re-enable after MVP when Coach roles are active again
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
-import { Coach } from "../models";
+import Coach from "../models/Coach";
 
-// Tüm antrenörleri getir
-export const getAllCoaches = async (req: Request, res: Response) => {
+export const getAllCoaches = async (_req: Request, res: Response) => {
   try {
     const coaches = await Coach.findAll({
       attributes: { exclude: ["password_hash"] },
@@ -24,7 +25,6 @@ export const getAllCoaches = async (req: Request, res: Response) => {
   }
 };
 
-// ID ile antrenör getir
 export const getCoachById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -54,7 +54,6 @@ export const getCoachById = async (req: Request, res: Response) => {
   }
 };
 
-// Yeni antrenör oluştur
 export const createCoach = async (req: Request, res: Response) => {
   try {
     const { name, email, password, role, assigned_stations } = req.body;
@@ -62,13 +61,11 @@ export const createCoach = async (req: Request, res: Response) => {
     if (!name || !email || !password || !role) {
       return res.status(400).json({
         success: false,
-        message: "Ad, email, şifre ve rol gerekli",
+        message: "İsim, email, şifre ve rol gerekli",
       });
     }
 
-    // Email zaten var mı kontrol et
     const existingCoach = await Coach.findOne({ where: { email } });
-
     if (existingCoach) {
       return res.status(400).json({
         success: false,
@@ -76,11 +73,8 @@ export const createCoach = async (req: Request, res: Response) => {
       });
     }
 
-    // Şifreyi hashle
-    const saltRounds = 10;
-    const password_hash = await bcrypt.hash(password, saltRounds);
+    const password_hash = await bcrypt.hash(password, 10);
 
-    // Antrenör oluştur
     const coach = await Coach.create({
       name,
       email,
@@ -109,7 +103,6 @@ export const createCoach = async (req: Request, res: Response) => {
   }
 };
 
-// Antrenör güncelle
 export const updateCoach = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -124,7 +117,6 @@ export const updateCoach = async (req: Request, res: Response) => {
       });
     }
 
-    // Email değişiyorsa kontrol et
     if (email && email !== coach.email) {
       const existingCoach = await Coach.findOne({ where: { email } });
       if (existingCoach) {
@@ -136,7 +128,6 @@ export const updateCoach = async (req: Request, res: Response) => {
       coach.email = email;
     }
 
-    // Güncelle
     if (name) coach.name = name;
     if (role) coach.role = role;
     if (assigned_stations) coach.assigned_stations = assigned_stations;
@@ -163,7 +154,6 @@ export const updateCoach = async (req: Request, res: Response) => {
   }
 };
 
-// Antrenör sil
 export const deleteCoach = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -192,30 +182,10 @@ export const deleteCoach = async (req: Request, res: Response) => {
   }
 };
 
-// İstasyona göre antrenörleri getir
-export const getCoachesByStation = async (req: Request, res: Response) => {
-  try {
-    const { stationId } = req.params;
-
-    const coaches = await Coach.findAll({
-      where: {
-        assigned_stations: {
-          [require("sequelize").Op.contains]: [stationId],
-        },
-      },
-      attributes: { exclude: ["password_hash"] },
-    });
-
-    return res.status(200).json({
-      success: true,
-      data: coaches,
-      count: coaches.length,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "İstasyon antrenörleri getirilirken hata oluştu",
-      error: error instanceof Error ? error.message : "Bilinmeyen hata",
-    });
-  }
+// TODO MVP: getCoachesByStation disabled
+export const getCoachesByStation = async (_req: Request, res: Response) => {
+  return res.status(503).json({
+    success: false,
+    message: "Station-based coach API is disabled for MVP",
+  });
 };
