@@ -4,7 +4,9 @@ import { TestSession, Athlete, AthleteTest, Measurement } from "../models";
 import { Op } from "sequelize";
 import {
   generateAthleteReport,
+  generateFrontendAthleteReport,
   AthleteReport,
+  FrontendAthleteReport,
   NoBenchmarkDataError,
 } from "../services/calculationService";
 
@@ -16,124 +18,131 @@ const REQUIRED_MEASUREMENT_FIELDS = [
   "sprint_30m",
   "agility",
   "vertical_jump",
+  "pass_count",
 ];
 
 /**
  * POST /api/test-sessions/:id/calculate-report
  * Calculate performance report for all athletes in a test session
+ *
+ * Response format matches frontend expectations exactly:
+ * {
+ *   testSessionId: string,
+ *   clubName: string,
+ *   reportGeneratedAt: string (ISO),
+ *   athletes: FrontendAthleteReport[]
+ * }
  */
 export const calculateReport = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const testSession = await TestSession.findByPk(id);
 
+    // 1. Load test session
+    const testSession = await TestSession.findByPk(id);
     if (!testSession) {
       return res.status(404).json({
-        success: false,
-        message: "Test oturumu bulunamadı",
+        error: "Test oturumu bulunamadı",
+        code: "TEST_SESSION_NOT_FOUND",
       });
     }
 
+    // 2. Load all athletes in this session
     const athleteTests = await AthleteTest.findAll({
       where: { test_session_id: id },
       include: [{ association: "athlete" }, { association: "measurement" }],
+      order: [["created_at", "ASC"]],
     });
 
     if (athleteTests.length === 0) {
       return res.status(400).json({
-        success: false,
-        message: "Bu oturumda sporcu bulunmuyor",
+        error: "Bu oturumda sporcu bulunmuyor",
+        code: "NO_ATHLETES_IN_SESSION",
       });
     }
 
-    const allCompleted = athleteTests.every((at: any) => at.is_completed);
-    if (!allCompleted) {
-      const completedCount = athleteTests.filter(
-        (at: any) => at.is_completed
-      ).length;
-      return res.status(400).json({
-        success: false,
-        message: `Tüm sporcuların testleri tamamlanmalı (${completedCount}/${athleteTests.length})`,
-      });
-    }
-
-    const reports: AthleteReport[] = [];
-    const errors: { athleteId: string; fullName: string; error: string }[] = [];
+    // 3. Generate reports for each athlete
+    const athletes: FrontendAthleteReport[] = [];
+    const warnings: { athleteId: string; fullName: string; warning: string }[] =
+      [];
 
     for (const athleteTest of athleteTests) {
       const measurement = (athleteTest as any).measurement;
       const athlete = (athleteTest as any).athlete;
 
-      if (!measurement) {
-        errors.push({
-          athleteId: athlete?.id,
-          fullName: athlete?.full_name || "Unknown",
-          error: "Ölçüm verisi bulunamadı",
-        });
-        continue;
-      }
-
       try {
-        const report = await generateAthleteReport(athleteTest, measurement);
-        reports.push(report);
-      } catch (err) {
-        if (err instanceof NoBenchmarkDataError) {
-          errors.push({
-            athleteId: athlete?.id,
-            fullName: athlete?.full_name || "Unknown",
-            error: err.message,
-          });
-        } else {
-          errors.push({
-            athleteId: athlete?.id,
-            fullName: athlete?.full_name || "Unknown",
-            error: err instanceof Error ? err.message : "Bilinmeyen hata",
+        // generateFrontendAthleteReport handles missing measurements and benchmark data gracefully
+        const report = await generateFrontendAthleteReport(
+          athleteTest,
+          measurement,
+        );
+        athletes.push(report);
+
+        // Add warning if no benchmark data (percentiles will be null)
+        if (measurement && report.metrics.sprint1.percentile === null) {
+          warnings.push({
+            athleteId: athlete.id,
+            fullName: athlete.full_name,
+            warning: `${athlete.birth_year} doğum yılı için benchmark verisi bulunamadı`,
           });
         }
-      }
-    }
+      } catch (err) {
+        // Even on error, add athlete with null metrics
+        athletes.push({
+          athleteId: athlete?.id,
+          fullName: athlete?.full_name || "Unknown",
+          birthYear: athlete?.birth_year || 0,
+          ageGroupAverages: {
+            sprint1: null,
+            sprint2: null,
+            agility: null,
+            flexibility: null,
+            verticalJump: null,
+            passCount: null,
+            bmi: null,
+          },
+          metrics: {
+            sprint1: { value: null, percentile: null, target: null },
+            sprint2: { value: null, percentile: null, target: null },
+            agility: { value: null, percentile: null, target: null },
+            flexibility: { value: null, percentile: null, target: null },
+            verticalJump: { value: null, percentile: null, target: null },
+            passCount: { value: null, percentile: null, target: null },
+            bmi: { value: null, percentile: null, target: null },
+            fatigueIndex: { value: null, percentile: null, target: null },
+          },
+          overallPerformance: 0,
+        });
 
-    // If all athletes failed due to no benchmark data, return 400
-    if (reports.length === 0 && errors.length > 0) {
-      const benchmarkErrors = errors.filter((e) =>
-        e.error.includes("benchmark")
-      );
-      if (benchmarkErrors.length === errors.length) {
-        return res.status(400).json({
-          success: false,
-          message: "No benchmark data for this age group",
-          errors,
+        warnings.push({
+          athleteId: athlete?.id,
+          fullName: athlete?.full_name || "Unknown",
+          warning: err instanceof Error ? err.message : "Bilinmeyen hata",
         });
       }
     }
 
-    if (
-      reports.length === athleteTests.length &&
-      testSession.status !== "completed"
-    ) {
+    // 4. Update session status if all have reports
+    if (athletes.length > 0 && testSession.status !== "completed") {
       testSession.status = "completed";
       await testSession.save();
     }
 
+    // 5. Return frontend-compatible response
     return res.status(200).json({
-      success: true,
-      data: {
-        testSessionId: id,
-        clubName: testSession.club_name,
-        testDate: testSession.test_date,
-        totalAthletes: athleteTests.length,
-        reportsGenerated: reports.length,
-        reports,
-        errors: errors.length > 0 ? errors : undefined,
-      },
-      message: `${reports.length} sporcu için rapor oluşturuldu`,
+      testSessionId: id,
+      clubName: testSession.club_name,
+      testDate: testSession.test_date,
+      reportGeneratedAt: new Date().toISOString(),
+      athletes,
+      // Include warnings as optional field for debugging
+      ...(warnings.length > 0 && { warnings }),
     });
   } catch (error) {
     console.error("calculateReport error:", error);
     return res.status(500).json({
-      success: false,
-      message: "Rapor oluşturulurken hata oluştu",
-      error: error instanceof Error ? error.message : "Bilinmeyen hata",
+      error: "Rapor oluşturulurken hata oluştu",
+      code: "INTERNAL_SERVER_ERROR",
+      details: error instanceof Error ? error.message : "Bilinmeyen hata",
     });
   }
 };
@@ -361,6 +370,7 @@ export const getSessionAthletes = async (req: Request, res: Response) => {
             sprint30mSecond: at.measurement.sprint_30m_second,
             agility: at.measurement.agility,
             verticalJump: at.measurement.vertical_jump,
+            passCount: at.measurement.pass_count,
             bmi: at.measurement.bmi,
             ffmi: at.measurement.ffmi,
             fatigueIndex: at.measurement.fatigue_index,
@@ -425,6 +435,8 @@ export const saveMeasurements = async (req: Request, res: Response) => {
       mappedData.agility = measurementData.agility;
     if (measurementData.verticalJump !== undefined)
       mappedData.vertical_jump = measurementData.verticalJump;
+    if (measurementData.passCount !== undefined)
+      mappedData.pass_count = measurementData.passCount;
     if (measurementData.bmi !== undefined) mappedData.bmi = measurementData.bmi;
     if (measurementData.ffmi !== undefined)
       mappedData.ffmi = measurementData.ffmi;
@@ -443,7 +455,7 @@ export const saveMeasurements = async (req: Request, res: Response) => {
 
     // Check if all required fields are filled
     const isComplete = REQUIRED_MEASUREMENT_FIELDS.every(
-      (field) => measurement![field as keyof typeof measurement] !== null
+      (field) => measurement![field as keyof typeof measurement] !== null,
     );
 
     // Auto-mark as completed if all required fields are filled
@@ -465,6 +477,7 @@ export const saveMeasurements = async (req: Request, res: Response) => {
         sprint30mSecond: measurement.sprint_30m_second,
         agility: measurement.agility,
         verticalJump: measurement.vertical_jump,
+        passCount: measurement.pass_count,
         bmi: measurement.bmi,
         ffmi: measurement.ffmi,
         fatigueIndex: measurement.fatigue_index,
@@ -570,7 +583,7 @@ export const getAllTestSessions = async (_req: Request, res: Response) => {
           completedAthletes,
           createdAt: session.created_at,
         };
-      })
+      }),
     );
 
     return res.status(200).json({

@@ -12,6 +12,7 @@ interface MeasurementAttributes {
   sprint_30m_second: number | null;
   agility: number | null;
   vertical_jump: number | null;
+  pass_count: number | null;
   ffmi: number | null;
   bmi: number | null;
   fatigue_index: number | null;
@@ -30,6 +31,7 @@ interface MeasurementCreationAttributes
     | "sprint_30m_second"
     | "agility"
     | "vertical_jump"
+    | "pass_count"
     | "ffmi"
     | "bmi"
     | "fatigue_index"
@@ -50,6 +52,7 @@ class Measurement
   public sprint_30m_second!: number | null;
   public agility!: number | null;
   public vertical_jump!: number | null;
+  public pass_count!: number | null;
   public ffmi!: number | null;
   public bmi!: number | null;
   public fatigue_index!: number | null;
@@ -99,6 +102,10 @@ Measurement.init(
     },
     vertical_jump: {
       type: DataTypes.DECIMAL(5, 2),
+      allowNull: true,
+    },
+    pass_count: {
+      type: DataTypes.INTEGER,
       allowNull: true,
     },
     ffmi: {

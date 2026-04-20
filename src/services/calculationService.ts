@@ -16,6 +16,7 @@ const METRIC_CONFIG: Record<string, { lowerIsBetter: boolean; label: string }> =
     sprint_30m_second: { lowerIsBetter: true, label: "30m Sprint (2)" },
     agility: { lowerIsBetter: true, label: "Çeviklik" },
     vertical_jump: { lowerIsBetter: false, label: "Dikey Sıçrama" },
+    pass_count: { lowerIsBetter: false, label: "Pas" },
     ffmi: { lowerIsBetter: false, label: "FFMI" },
     fatigue_index: { lowerIsBetter: true, label: "Yorgunluk İndeksi" },
   };
@@ -29,7 +30,7 @@ export function calculateBMI(heightCm: number, weightKg: number): number {
 export function calculateFFMI(
   heightCm: number,
   weightKg: number,
-  bodyFatPercent = 15
+  bodyFatPercent = 15,
 ): number {
   if (!heightCm || !weightKg || heightCm <= 0 || weightKg <= 0) return 0;
   const heightM = heightCm / 100;
@@ -39,22 +40,30 @@ export function calculateFFMI(
 
 export function calculateFatigueIndex(
   sprint1: number,
-  sprint2: number
+  sprint2: number,
 ): number {
   if (!sprint1 || !sprint2 || sprint1 <= 0) return 0;
   return Number((((sprint2 - sprint1) / sprint1) * 100).toFixed(2));
 }
 
+function calculatePassScore(passCount: number | null, birthYear: number): number | null {
+  if (passCount === null || passCount === undefined || isNaN(passCount)) return null;
+
+  const age = new Date().getFullYear() - birthYear;
+  const target = Math.max(12, Math.min(32, 10 + age * 1.15));
+  return Math.max(1, Math.min(100, Math.round((passCount / target) * 70)));
+}
+
 export function calculatePercentile(
   value: number | null,
   referenceValues: (number | null)[],
-  lowerIsBetter = false
+  lowerIsBetter = false,
 ): number | null {
   // Guard: null/undefined/NaN value
   if (value === null || value === undefined || isNaN(value)) return null;
 
   const validValues = referenceValues.filter(
-    (v): v is number => v !== null && v !== undefined && !isNaN(v)
+    (v): v is number => v !== null && v !== undefined && !isNaN(v),
   );
 
   // Guard: no valid reference values - return median
@@ -73,7 +82,7 @@ export function calculatePercentile(
 }
 
 export async function getReferenceDataByBirthYear(
-  birthYear: number
+  birthYear: number,
 ): Promise<HistoricalAthleteData[]> {
   return HistoricalAthleteData.findAll({ where: { birth_year: birthYear } });
 }
@@ -92,7 +101,7 @@ export function calculateDerivedMetrics(measurement: Measurement) {
 
 export function calculateAllPercentiles(
   measurement: any,
-  referenceData: HistoricalAthleteData[]
+  referenceData: HistoricalAthleteData[],
 ) {
   const percentiles: Record<string, number | null> = {};
   const metrics = [
@@ -104,6 +113,7 @@ export function calculateAllPercentiles(
     "sprint_30m_second",
     "agility",
     "vertical_jump",
+    "pass_count",
     "ffmi",
     "fatigue_index",
   ];
@@ -113,32 +123,32 @@ export function calculateAllPercentiles(
     if (!config) continue;
     const athleteValue = Number(measurement[metric]) || null;
     const referenceValues = referenceData.map((ref: any) =>
-      ref[metric] !== null ? Number(ref[metric]) : null
+      ref[metric] !== null ? Number(ref[metric]) : null,
     );
 
     percentiles[metric] = calculatePercentile(
       athleteValue,
       referenceValues,
-      config.lowerIsBetter
+      config.lowerIsBetter,
     );
   }
   return percentiles;
 }
 
 export function calculateOverallPerformance(
-  percentiles: Record<string, number | null>
+  percentiles: Record<string, number | null>,
 ): number {
   const validPercentiles = Object.values(percentiles).filter(
-    (p): p is number => p !== null
+    (p): p is number => p !== null,
   );
   if (validPercentiles.length === 0) return 50;
   return Math.round(
-    validPercentiles.reduce((acc, p) => acc + p, 0) / validPercentiles.length
+    validPercentiles.reduce((acc, p) => acc + p, 0) / validPercentiles.length,
   );
 }
 
 export function calculateFourMonthTargets(
-  percentiles: Record<string, number | null>
+  percentiles: Record<string, number | null>,
 ) {
   const targets: Record<string, number | null> = {};
   for (const [metric, percentile] of Object.entries(percentiles)) {
@@ -170,7 +180,7 @@ export interface AthleteReport {
 
 export async function generateAthleteReport(
   athleteTest: any,
-  measurement: Measurement
+  measurement: Measurement,
 ): Promise<AthleteReport> {
   const athlete = athleteTest.athlete;
   const referenceData = await getReferenceDataByBirthYear(athlete.birth_year);
@@ -190,6 +200,7 @@ export async function generateAthleteReport(
     sprint_30m_second: measurement.sprint_30m_second,
     agility: measurement.agility,
     vertical_jump: measurement.vertical_jump,
+    pass_count: measurement.pass_count,
     bmi: derived.bmi,
     ffmi: derived.ffmi,
     fatigue_index: derived.fatigueIndex,
@@ -212,6 +223,7 @@ export async function generateAthleteReport(
       sprint30mSecond: measurement.sprint_30m_second,
       agility: measurement.agility,
       verticalJump: measurement.vertical_jump,
+      passCount: measurement.pass_count,
       bmi: derived.bmi,
       ffmi: derived.ffmi,
       fatigueIndex: derived.fatigueIndex,
@@ -220,5 +232,221 @@ export async function generateAthleteReport(
     fourMonthTargets,
     overallPerformance,
     referenceCount: referenceData.length,
+  };
+}
+
+// ============================================
+// FRONTEND-COMPATIBLE TYPES AND FUNCTIONS
+// ============================================
+
+/**
+ * Single metric result structure for frontend
+ */
+export interface MetricResult {
+  value: number | null;
+  percentile: number | null;
+  target: number | null;
+}
+
+/**
+ * Frontend-compatible athlete report structure
+ * Field names match exactly what frontend expects
+ */
+export interface FrontendAthleteReport {
+  athleteId: string;
+  fullName: string;
+  birthYear: number;
+  ageGroupAverages: {
+    sprint1: number | null;
+    sprint2: number | null;
+    agility: number | null;
+    flexibility: number | null;
+    verticalJump: number | null;
+    passCount: number | null;
+    bmi: number | null;
+  };
+  metrics: {
+    sprint1: MetricResult;
+    sprint2: MetricResult;
+    agility: MetricResult;
+    flexibility: MetricResult;
+    verticalJump: MetricResult;
+    passCount: MetricResult;
+    bmi: MetricResult;
+    fatigueIndex: MetricResult;
+  };
+  overallPerformance: number;
+}
+
+function average(values: (number | null | undefined)[]): number | null {
+  const validValues = values
+    .map((value) => (value === null || value === undefined ? null : Number(value)))
+    .filter((value): value is number => value !== null && !isNaN(value));
+
+  if (validValues.length === 0) return null;
+
+  return Number(
+    (
+      validValues.reduce((total, value) => total + value, 0) / validValues.length
+    ).toFixed(2),
+  );
+}
+
+function calculateAgeGroupAverages(
+  referenceData: HistoricalAthleteData[],
+  birthYear: number,
+): FrontendAthleteReport["ageGroupAverages"] {
+  const currentYear = new Date().getFullYear();
+  const age = currentYear - birthYear;
+  const passTarget = Math.max(12, Math.min(32, 10 + age * 1.15));
+
+  return {
+    sprint1: average(referenceData.map((ref) => ref.sprint_30m)),
+    sprint2: average(referenceData.map((ref) => ref.sprint_30m_second)),
+    agility: average(referenceData.map((ref) => ref.agility)),
+    flexibility: average(referenceData.map((ref) => ref.flexibility)),
+    verticalJump: average(referenceData.map((ref) => ref.vertical_jump)),
+    passCount: Number(passTarget.toFixed(0)),
+    bmi: average(
+      referenceData.map((ref) =>
+        ref.height && ref.weight ? calculateBMI(Number(ref.height), Number(ref.weight)) : null,
+      ),
+    ),
+  };
+}
+
+/**
+ * Generate a frontend-compatible athlete report
+ * Returns partial data with null percentiles if benchmark data is missing
+ */
+export async function generateFrontendAthleteReport(
+  athleteTest: any,
+  measurement: Measurement | null,
+): Promise<FrontendAthleteReport> {
+  const athlete = athleteTest.athlete;
+
+  // If no measurement, return empty metrics
+  if (!measurement) {
+    return {
+      athleteId: athlete.id,
+      fullName: athlete.full_name,
+      birthYear: athlete.birth_year,
+      ageGroupAverages: {
+        sprint1: null,
+        sprint2: null,
+        agility: null,
+        flexibility: null,
+        verticalJump: null,
+        passCount: null,
+        bmi: null,
+      },
+      metrics: {
+        sprint1: { value: null, percentile: null, target: null },
+        sprint2: { value: null, percentile: null, target: null },
+        agility: { value: null, percentile: null, target: null },
+        flexibility: { value: null, percentile: null, target: null },
+        verticalJump: { value: null, percentile: null, target: null },
+        passCount: { value: null, percentile: null, target: null },
+        bmi: { value: null, percentile: null, target: null },
+        fatigueIndex: { value: null, percentile: null, target: null },
+      },
+      overallPerformance: 0,
+    };
+  }
+
+  // Calculate derived metrics
+  const derived = calculateDerivedMetrics(measurement);
+
+  // Get reference data for percentile calculation
+  const referenceData = await getReferenceDataByBirthYear(athlete.birth_year);
+  const hasBenchmark = referenceData.length > 0;
+  const ageGroupAverages = calculateAgeGroupAverages(
+    referenceData,
+    athlete.birth_year,
+  );
+
+  // Build full measurement object for percentile calculation
+  const fullMeasurement = {
+    height: measurement.height,
+    weight: measurement.weight,
+    flexibility: measurement.flexibility,
+    sprint_30m: measurement.sprint_30m,
+    sprint_30m_second: measurement.sprint_30m_second,
+    agility: measurement.agility,
+    vertical_jump: measurement.vertical_jump,
+    pass_count: measurement.pass_count,
+    bmi: derived.bmi,
+    ffmi: derived.ffmi,
+    fatigue_index: derived.fatigueIndex,
+  };
+
+  // Calculate percentiles only if benchmark data exists
+  const percentiles = hasBenchmark
+    ? calculateAllPercentiles(fullMeasurement, referenceData)
+    : {};
+
+  // Helper to build MetricResult
+  const buildMetric = (
+    value: number | null,
+    percentileKey: string,
+  ): MetricResult => {
+    const percentile = hasBenchmark
+      ? (percentiles[percentileKey] ?? null)
+      : null;
+    const target = percentile !== null ? Math.min(99, percentile + 10) : null;
+    return {
+      value: value !== null ? Number(value) : null,
+      percentile,
+      target,
+    };
+  };
+
+  // Build metrics object with frontend-expected field names
+  const metrics = {
+    sprint1: buildMetric(measurement.sprint_30m, "sprint_30m"),
+    sprint2: buildMetric(measurement.sprint_30m_second, "sprint_30m_second"),
+    agility: buildMetric(measurement.agility, "agility"),
+    flexibility: buildMetric(measurement.flexibility, "flexibility"),
+    verticalJump: buildMetric(measurement.vertical_jump, "vertical_jump"),
+    passCount: {
+      value:
+        measurement.pass_count !== null && measurement.pass_count !== undefined
+          ? Number(measurement.pass_count)
+          : null,
+      percentile: calculatePassScore(
+        measurement.pass_count !== null && measurement.pass_count !== undefined
+          ? Number(measurement.pass_count)
+          : null,
+        athlete.birth_year,
+      ),
+      target:
+        measurement.pass_count !== null && measurement.pass_count !== undefined
+          ? Math.ceil(Number(measurement.pass_count) * 1.12)
+          : null,
+    },
+    bmi: buildMetric(derived.bmi, "bmi"),
+    fatigueIndex: buildMetric(derived.fatigueIndex, "fatigue_index"),
+  };
+
+  // Calculate overall performance from valid percentiles
+  const validPercentiles = Object.values(metrics)
+    .map((m) => m.percentile)
+    .filter((p): p is number => p !== null);
+
+  const overallPerformance =
+    validPercentiles.length > 0
+      ? Math.round(
+          validPercentiles.reduce((acc, p) => acc + p, 0) /
+            validPercentiles.length,
+        )
+      : 0;
+
+  return {
+    athleteId: athlete.id,
+    fullName: athlete.full_name,
+    birthYear: athlete.birth_year,
+    ageGroupAverages,
+    metrics,
+    overallPerformance,
   };
 }
