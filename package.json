@@ -12,7 +12,9 @@
     "seed": "npx sequelize-cli db:seed:all",
     "seed:undo": "npx sequelize-cli db:seed:undo:all",
     "sync-db": "npx ts-node src/scripts/sync-database.ts",
-    "create-stations": "npx ts-node src/scripts/create-stations.ts"
+    "create-stations": "npx ts-node src/scripts/create-stations.ts",
+    "backfill-gender": "npx ts-node src/scripts/backfill-gender.ts",
+    "import-test-folder": "npx ts-node src/scripts/import-test-folder.ts"
   },
   "keywords": [
     "athletic",

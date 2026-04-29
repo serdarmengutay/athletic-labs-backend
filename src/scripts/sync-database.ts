@@ -6,6 +6,7 @@ import {
   Measurement,
   HistoricalAthleteData,
 } from "../models";
+import { ATHLETE_GENDERS } from "../config/gender";
 
 // TODO MVP: Commented out old models
 /*
@@ -50,6 +51,7 @@ const syncDatabase = async () => {
       full_name: "Test Sporcu",
       birth_year: 2010,
       birth_date: new Date("2010-05-15"),
+      gender: ATHLETE_GENDERS.MALE,
     });
 
     // AthleteTest oluştur
@@ -75,6 +77,7 @@ const syncDatabase = async () => {
     const historicalData = [
       {
         birth_year: 2010,
+        gender: ATHLETE_GENDERS.MALE,
         height: 140,
         weight: 35,
         flexibility: 10,
@@ -85,6 +88,7 @@ const syncDatabase = async () => {
       },
       {
         birth_year: 2010,
+        gender: ATHLETE_GENDERS.MALE,
         height: 142,
         weight: 37,
         flexibility: 11,
@@ -95,6 +99,7 @@ const syncDatabase = async () => {
       },
       {
         birth_year: 2010,
+        gender: ATHLETE_GENDERS.MALE,
         height: 145,
         weight: 38,
         flexibility: 12,
@@ -105,6 +110,7 @@ const syncDatabase = async () => {
       },
       {
         birth_year: 2011,
+        gender: ATHLETE_GENDERS.MALE,
         height: 138,
         weight: 33,
         flexibility: 9,
@@ -115,6 +121,7 @@ const syncDatabase = async () => {
       },
       {
         birth_year: 2011,
+        gender: ATHLETE_GENDERS.MALE,
         height: 140,
         weight: 35,
         flexibility: 10,

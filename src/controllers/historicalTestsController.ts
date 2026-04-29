@@ -14,6 +14,7 @@ import {
   HistoricalAthleteData,
 } from "../models";
 import sequelize from "../config/database";
+import { ATHLETE_GENDERS } from "../config/gender";
 import {
   generateAthleteReport,
   NoBenchmarkDataError,
@@ -311,6 +312,7 @@ export const importHistoricalTests = async (req: Request, res: Response) => {
           {
             full_name: row.athleteName || `Athlete_${rowNum}`,
             birth_year: row.birthYear,
+            gender: ATHLETE_GENDERS.MALE,
           },
           { transaction }
         );
@@ -346,6 +348,7 @@ export const importHistoricalTests = async (req: Request, res: Response) => {
         await HistoricalAthleteData.create(
           {
             birth_year: row.birthYear,
+            gender: ATHLETE_GENDERS.MALE,
             height: row.height ?? null,
             weight: row.weight ?? null,
             flexibility: row.flexibility ?? null,

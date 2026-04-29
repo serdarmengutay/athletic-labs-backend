@@ -1,6 +1,7 @@
 // TODO MVP: Simplified athlete controller for MVP
 import { Request, Response } from "express";
 import { Athlete } from "../models";
+import { normalizeGender } from "../config/gender";
 
 export const getAllAthletes = async (_req: Request, res: Response) => {
   try {
@@ -52,7 +53,7 @@ export const getAthleteById = async (req: Request, res: Response) => {
 
 export const createAthlete = async (req: Request, res: Response) => {
   try {
-    const { full_name, birth_year, birth_date } = req.body;
+    const { full_name, birth_year, birth_date, gender } = req.body;
 
     if (!full_name || !birth_year) {
       return res.status(400).json({
@@ -65,6 +66,7 @@ export const createAthlete = async (req: Request, res: Response) => {
       full_name,
       birth_year,
       birth_date: birth_date ? new Date(birth_date) : null,
+      gender: normalizeGender(gender),
     });
 
     return res.status(201).json({
@@ -84,7 +86,7 @@ export const createAthlete = async (req: Request, res: Response) => {
 export const updateAthlete = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { full_name, birth_year, birth_date } = req.body;
+    const { full_name, birth_year, birth_date, gender } = req.body;
 
     const athlete = await Athlete.findOne({ where: { id } });
 
@@ -98,6 +100,7 @@ export const updateAthlete = async (req: Request, res: Response) => {
     if (full_name) athlete.full_name = full_name;
     if (birth_year) athlete.birth_year = birth_year;
     if (birth_date) athlete.birth_date = new Date(birth_date);
+    if (gender !== undefined) athlete.gender = normalizeGender(gender);
 
     await athlete.save();
 

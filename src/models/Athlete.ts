@@ -1,5 +1,6 @@
 import { DataTypes, Model, Optional } from "sequelize";
 import sequelize from "../config/database";
+import { ATHLETE_GENDERS, AthleteGender } from "../config/gender";
 
 // TODO MVP: Simplified athlete model - removed club_id, measurement fields moved to Measurement model
 interface AthleteAttributes {
@@ -7,6 +8,7 @@ interface AthleteAttributes {
   full_name: string;
   birth_date: Date | null;
   birth_year: number;
+  gender: AthleteGender;
   created_at: Date;
   updated_at: Date;
 }
@@ -14,7 +16,7 @@ interface AthleteAttributes {
 interface AthleteCreationAttributes
   extends Optional<
     AthleteAttributes,
-    "id" | "birth_date" | "created_at" | "updated_at"
+    "id" | "birth_date" | "gender" | "created_at" | "updated_at"
   > {}
 
 class Athlete
@@ -25,6 +27,7 @@ class Athlete
   public full_name!: string;
   public birth_date!: Date | null;
   public birth_year!: number;
+  public gender!: AthleteGender;
   public readonly created_at!: Date;
   public readonly updated_at!: Date;
 }
@@ -48,6 +51,14 @@ Athlete.init(
       type: DataTypes.INTEGER,
       allowNull: false,
     },
+    gender: {
+      type: DataTypes.STRING(10),
+      allowNull: false,
+      defaultValue: ATHLETE_GENDERS.MALE,
+      validate: {
+        isIn: [[ATHLETE_GENDERS.MALE, ATHLETE_GENDERS.FEMALE]],
+      },
+    },
     created_at: {
       type: DataTypes.DATE,
       allowNull: false,
@@ -62,6 +73,7 @@ Athlete.init(
   {
     sequelize,
     tableName: "athletes",
+    indexes: [{ fields: ["birth_year", "gender"] }],
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at",

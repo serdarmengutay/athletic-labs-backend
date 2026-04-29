@@ -1,10 +1,12 @@
 import { DataTypes, Model, Optional } from "sequelize";
 import sequelize from "../config/database";
+import { ATHLETE_GENDERS, AthleteGender } from "../config/gender";
 
 // MVP: Standalone historical data for percentile calculations
 interface HistoricalAthleteDataAttributes {
   id: string;
   birth_year: number;
+  gender: AthleteGender;
   height: number | null;
   weight: number | null;
   bmi: number | null;
@@ -13,7 +15,9 @@ interface HistoricalAthleteDataAttributes {
   sprint_30m_second: number | null;
   agility: number | null;
   vertical_jump: number | null;
+  pass_count: number | null;
   ffmi: number | null;
+  fatigue_index: number | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -22,6 +26,7 @@ interface HistoricalAthleteDataCreationAttributes
   extends Optional<
     HistoricalAthleteDataAttributes,
     | "id"
+    | "gender"
     | "height"
     | "weight"
     | "bmi"
@@ -30,7 +35,9 @@ interface HistoricalAthleteDataCreationAttributes
     | "sprint_30m_second"
     | "agility"
     | "vertical_jump"
+    | "pass_count"
     | "ffmi"
+    | "fatigue_index"
     | "created_at"
     | "updated_at"
   > {}
@@ -44,6 +51,7 @@ class HistoricalAthleteData
 {
   public id!: string;
   public birth_year!: number;
+  public gender!: AthleteGender;
   public height!: number | null;
   public weight!: number | null;
   public bmi!: number | null;
@@ -52,7 +60,9 @@ class HistoricalAthleteData
   public sprint_30m_second!: number | null;
   public agility!: number | null;
   public vertical_jump!: number | null;
+  public pass_count!: number | null;
   public ffmi!: number | null;
+  public fatigue_index!: number | null;
   public readonly created_at!: Date;
   public readonly updated_at!: Date;
 }
@@ -67,6 +77,14 @@ HistoricalAthleteData.init(
     birth_year: {
       type: DataTypes.INTEGER,
       allowNull: false,
+    },
+    gender: {
+      type: DataTypes.STRING(10),
+      allowNull: false,
+      defaultValue: ATHLETE_GENDERS.MALE,
+      validate: {
+        isIn: [[ATHLETE_GENDERS.MALE, ATHLETE_GENDERS.FEMALE]],
+      },
     },
     height: {
       type: DataTypes.DECIMAL(5, 2),
@@ -100,7 +118,15 @@ HistoricalAthleteData.init(
       type: DataTypes.DECIMAL(5, 2),
       allowNull: true,
     },
+    pass_count: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
     ffmi: {
+      type: DataTypes.DECIMAL(5, 2),
+      allowNull: true,
+    },
+    fatigue_index: {
       type: DataTypes.DECIMAL(5, 2),
       allowNull: true,
     },
@@ -118,6 +144,7 @@ HistoricalAthleteData.init(
   {
     sequelize,
     tableName: "historical_athlete_data",
+    indexes: [{ fields: ["birth_year", "gender"] }],
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at",

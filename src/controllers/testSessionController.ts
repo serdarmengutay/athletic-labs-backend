@@ -2,6 +2,7 @@
 import { Request, Response } from "express";
 import { TestSession, Athlete, AthleteTest, Measurement } from "../models";
 import { Op } from "sequelize";
+import { normalizeGender } from "../config/gender";
 import {
   generateAthleteReport,
   generateFrontendAthleteReport,
@@ -82,7 +83,7 @@ export const calculateReport = async (req: Request, res: Response) => {
           warnings.push({
             athleteId: athlete.id,
             fullName: athlete.full_name,
-            warning: `${athlete.birth_year} doğum yılı için benchmark verisi bulunamadı`,
+            warning: `${athlete.birth_year} doğum yılı ve ${athlete.gender} grubu için yeterli benchmark verisi bulunamadı`,
           });
         }
       } catch (err) {
@@ -91,6 +92,7 @@ export const calculateReport = async (req: Request, res: Response) => {
           athleteId: athlete?.id,
           fullName: athlete?.full_name || "Unknown",
           birthYear: athlete?.birth_year || 0,
+          measurements: {},
           ageGroupAverages: {
             sprint1: null,
             sprint2: null,
@@ -100,15 +102,24 @@ export const calculateReport = async (req: Request, res: Response) => {
             passCount: null,
             bmi: null,
           },
+          ageGroupPercentiles: {
+            sprint1: null,
+            sprint2: null,
+            agility: null,
+            flexibility: null,
+            verticalJump: null,
+            passCount: null,
+            bmi: null,
+          },
           metrics: {
-            sprint1: { value: null, percentile: null, target: null },
-            sprint2: { value: null, percentile: null, target: null },
-            agility: { value: null, percentile: null, target: null },
-            flexibility: { value: null, percentile: null, target: null },
-            verticalJump: { value: null, percentile: null, target: null },
-            passCount: { value: null, percentile: null, target: null },
-            bmi: { value: null, percentile: null, target: null },
-            fatigueIndex: { value: null, percentile: null, target: null },
+            sprint1: { value: null, score: null, percentile: null, target: null },
+            sprint2: { value: null, score: null, percentile: null, target: null },
+            agility: { value: null, score: null, percentile: null, target: null },
+            flexibility: { value: null, score: null, percentile: null, target: null },
+            verticalJump: { value: null, score: null, percentile: null, target: null },
+            passCount: { value: null, score: null, percentile: null, target: null },
+            bmi: { value: null, score: null, percentile: null, target: null },
+            fatigueIndex: { value: null, score: null, percentile: null, target: null },
           },
           overallPerformance: 0,
         });
@@ -243,7 +254,7 @@ export const bulkImportAthletes = async (req: Request, res: Response) => {
 
     for (const athleteData of athletes) {
       try {
-        const { fullName, birthDate, birthYear } = athleteData;
+        const { fullName, birthDate, birthYear, gender } = athleteData;
 
         if (!fullName) {
           errors.push({ data: athleteData, error: "fullName gerekli" });
@@ -274,6 +285,7 @@ export const bulkImportAthletes = async (req: Request, res: Response) => {
           full_name: fullName,
           birth_date: parsedBirthDate,
           birth_year: calculatedBirthYear,
+          gender: normalizeGender(gender),
         });
 
         // Create AthleteTest record
@@ -293,6 +305,7 @@ export const bulkImportAthletes = async (req: Request, res: Response) => {
           athleteTestId: athleteTest.id,
           fullName: athlete.full_name,
           birthYear: athlete.birth_year,
+          gender: athlete.gender,
         });
       } catch (err) {
         errors.push({
@@ -358,6 +371,7 @@ export const getSessionAthletes = async (req: Request, res: Response) => {
       fullName: at.athlete?.full_name,
       birthDate: at.athlete?.birth_date,
       birthYear: at.athlete?.birth_year,
+      gender: at.athlete?.gender,
       isCompleted: at.is_completed,
       completedAt: at.completed_at,
       measurement: at.measurement

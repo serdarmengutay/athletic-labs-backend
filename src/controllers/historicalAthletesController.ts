@@ -6,6 +6,11 @@ import { Request, Response } from "express";
 import multer from "multer";
 import * as XLSX from "xlsx";
 import { HistoricalAthleteData } from "../models";
+import { normalizeGender } from "../config/gender";
+import {
+  mapExcelRow,
+  ParsedHistoricalRow,
+} from "../utils/historicalImport";
 
 // Configure multer for memory storage
 const storage = multer.memoryStorage();
@@ -25,18 +30,6 @@ export const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
 });
 
-interface ExcelRow {
-  fullName?: string;
-  birthYear?: number;
-  height?: number;
-  weight?: number;
-  flexibility?: number;
-  sprint30m?: number;
-  sprint30m2?: number;
-  agility?: number;
-  verticalJump?: number;
-}
-
 /**
  * POST /api/historical-athletes/import
  * Import historical athlete data from Excel file
@@ -54,7 +47,8 @@ export const importHistoricalAthletes = async (req: Request, res: Response) => {
     const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
-    const rows: ExcelRow[] = XLSX.utils.sheet_to_json(worksheet);
+    const rawRows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(worksheet);
+    const rows: ParsedHistoricalRow[] = rawRows.map(mapExcelRow);
 
     let importedRows = 0;
     let skippedRows = 0;
@@ -77,14 +71,18 @@ export const importHistoricalAthletes = async (req: Request, res: Response) => {
       try {
         await HistoricalAthleteData.create({
           birth_year: Number(row.birthYear),
-          height: row.height ? Number(row.height) : null,
-          weight: row.weight ? Number(row.weight) : null,
-          flexibility: row.flexibility ? Number(row.flexibility) : null,
-          sprint_30m: row.sprint30m ? Number(row.sprint30m) : null,
-          sprint_30m_second: row.sprint30m2 ? Number(row.sprint30m2) : null,
-          agility: row.agility ? Number(row.agility) : null,
-          vertical_jump: row.verticalJump ? Number(row.verticalJump) : null,
-          // TODO: Calculate BMI and FFMI if height/weight available
+          gender: normalizeGender(row.gender),
+          height: row.height ?? null,
+          weight: row.weight ?? null,
+          bmi: row.bmi ?? null,
+          flexibility: row.flexibility ?? null,
+          sprint_30m: row.sprint30 ?? null,
+          sprint_30m_second: row.sprint30_2 ?? null,
+          agility: row.agility ?? null,
+          vertical_jump: row.verticalJump ?? null,
+          pass_count: row.passCount ?? null,
+          ffmi: row.ffmi ?? null,
+          fatigue_index: row.fatigueIndex ?? null,
         });
         importedRows++;
       } catch (err) {
