@@ -347,6 +347,7 @@ export const importHistoricalTests = async (req: Request, res: Response) => {
         // Also create HistoricalAthleteData record for benchmark pool
         await HistoricalAthleteData.create(
           {
+            full_name: row.athleteName?.trim() || null,
             birth_year: row.birthYear,
             gender: ATHLETE_GENDERS.MALE,
             height: row.height ?? null,

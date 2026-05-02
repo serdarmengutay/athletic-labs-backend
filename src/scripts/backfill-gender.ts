@@ -30,6 +30,11 @@ async function backfillGender() {
 
     await sequelize.query(`
       ALTER TABLE historical_athlete_data
+      ADD COLUMN IF NOT EXISTS full_name VARCHAR(150)
+    `);
+
+    await sequelize.query(`
+      ALTER TABLE historical_athlete_data
       ADD COLUMN IF NOT EXISTS gender VARCHAR(10)
     `);
 

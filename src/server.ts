@@ -21,6 +21,7 @@ import testSessionRoutes from "./routes/testSessions";
 import athleteTestRoutes from "./routes/athleteTests";
 import historicalAthletesRoutes from "./routes/historicalAthletes";
 import historicalTestsRoutes from "./routes/historicalTests";
+import scoutingRoutes from "./routes/scouting";
 // TODO MVP: commented out QR / station auth
 // import qrRoutes from "./routes/qr";
 // import stationRoutes from "./routes/station";
@@ -81,6 +82,7 @@ app.use("/api/test-sessions", testSessionRoutes);
 app.use("/api/athlete-tests", athleteTestRoutes);
 app.use("/api/historical-athletes", historicalAthletesRoutes);
 app.use("/api/historical-tests", historicalTestsRoutes);
+app.use("/api/scouting", scoutingRoutes);
 // Legacy routes (will be deprecated)
 app.use("/api/clubs", clubRoutes);
 app.use("/api/athletes", athleteRoutes);

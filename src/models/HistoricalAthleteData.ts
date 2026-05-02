@@ -5,6 +5,10 @@ import { ATHLETE_GENDERS, AthleteGender } from "../config/gender";
 // MVP: Standalone historical data for percentile calculations
 interface HistoricalAthleteDataAttributes {
   id: string;
+  full_name: string | null;
+  club_name: string | null;
+  country_code: string;
+  country_name: string;
   birth_year: number;
   gender: AthleteGender;
   height: number | null;
@@ -26,6 +30,10 @@ interface HistoricalAthleteDataCreationAttributes
   extends Optional<
     HistoricalAthleteDataAttributes,
     | "id"
+    | "full_name"
+    | "club_name"
+    | "country_code"
+    | "country_name"
     | "gender"
     | "height"
     | "weight"
@@ -50,6 +58,10 @@ class HistoricalAthleteData
   implements HistoricalAthleteDataAttributes
 {
   public id!: string;
+  public full_name!: string | null;
+  public club_name!: string | null;
+  public country_code!: string;
+  public country_name!: string;
   public birth_year!: number;
   public gender!: AthleteGender;
   public height!: number | null;
@@ -73,6 +85,24 @@ HistoricalAthleteData.init(
       type: DataTypes.UUID,
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
+    },
+    full_name: {
+      type: DataTypes.STRING(150),
+      allowNull: true,
+    },
+    club_name: {
+      type: DataTypes.STRING(150),
+      allowNull: true,
+    },
+    country_code: {
+      type: DataTypes.STRING(4),
+      allowNull: false,
+      defaultValue: "TR",
+    },
+    country_name: {
+      type: DataTypes.STRING(100),
+      allowNull: false,
+      defaultValue: "Türkiye",
     },
     birth_year: {
       type: DataTypes.INTEGER,

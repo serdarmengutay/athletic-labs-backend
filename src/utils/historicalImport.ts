@@ -59,6 +59,34 @@ export interface ParsedHistoricalRow {
   fatigueIndex?: number;
 }
 
+function prettifyClubToken(token: string): string {
+  return token
+    .replace(/\.[^.]+$/g, "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\b(TEST|VERILERI|VERILERİ|VERİLERİ|KARNELER|KARNE|RAPORLARI|RAPORLAR|RAPORU)\b/gi, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLocaleLowerCase("tr-TR")
+    .replace(/\b\w/g, (char) => char.toLocaleUpperCase("tr-TR"));
+}
+
+export function extractClubNameFromFilePath(
+  filePath: string,
+  rootDir = "/Users/setfree/Documents/TEST",
+): string | null {
+  const normalizedRoot = path.resolve(rootDir);
+  const normalizedFile = path.resolve(filePath);
+  const relativePath = path.relative(normalizedRoot, normalizedFile);
+  const segments = relativePath.split(path.sep).filter(Boolean);
+
+  const preferredSegment =
+    segments.find((segment) => !/\.(xlsx|xls|csv)$/i.test(segment)) ??
+    path.basename(filePath, path.extname(filePath));
+
+  const cleaned = prettifyClubToken(preferredSegment);
+  return cleaned || null;
+}
+
 export interface ParsedWorkbookSheet {
   sheetName: string;
   rows: ParsedHistoricalRow[];

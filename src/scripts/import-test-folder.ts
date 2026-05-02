@@ -6,6 +6,7 @@ import { ATHLETE_GENDERS, normalizeGender } from "../config/gender";
 import { HistoricalAthleteData } from "../models";
 import {
   buildDuplicateCandidateHash,
+  extractClubNameFromFilePath,
   isLikelyHistoricalTestSheet,
   mapExcelRow,
   ParsedHistoricalRow,
@@ -17,6 +18,7 @@ const OUTPUT_DIR = path.resolve(
   "/Users/setfree/Documents/projects/athletic-labs-backend/outputs/test-folder-import",
 );
 const DRY_RUN = process.argv.includes("--dry-run");
+const TRUNCATE_FIRST = process.argv.includes("--truncate");
 
 interface DuplicateCandidateEntry {
   filePath: string;
@@ -45,6 +47,22 @@ interface ImportReport {
 async function ensureHistoricalTableColumns() {
   await sequelize.query(`
     ALTER TABLE historical_athlete_data
+    ADD COLUMN IF NOT EXISTS full_name VARCHAR(150)
+  `);
+  await sequelize.query(`
+    ALTER TABLE historical_athlete_data
+    ADD COLUMN IF NOT EXISTS club_name VARCHAR(150)
+  `);
+  await sequelize.query(`
+    ALTER TABLE historical_athlete_data
+    ADD COLUMN IF NOT EXISTS country_code VARCHAR(4)
+  `);
+  await sequelize.query(`
+    ALTER TABLE historical_athlete_data
+    ADD COLUMN IF NOT EXISTS country_name VARCHAR(100)
+  `);
+  await sequelize.query(`
+    ALTER TABLE historical_athlete_data
     ADD COLUMN IF NOT EXISTS gender VARCHAR(10)
   `);
   await sequelize.query(`
@@ -63,6 +81,23 @@ async function ensureHistoricalTableColumns() {
   await sequelize.query(`
     ALTER TABLE historical_athlete_data
     ALTER COLUMN gender SET DEFAULT '${ATHLETE_GENDERS.MALE}'
+  `);
+  await sequelize.query(`
+    UPDATE historical_athlete_data
+    SET country_code = 'TR',
+        country_name = 'Türkiye'
+    WHERE country_code IS NULL
+       OR TRIM(country_code) = ''
+       OR country_name IS NULL
+       OR TRIM(country_name) = ''
+  `);
+  await sequelize.query(`
+    ALTER TABLE historical_athlete_data
+    ALTER COLUMN country_code SET DEFAULT 'TR'
+  `);
+  await sequelize.query(`
+    ALTER TABLE historical_athlete_data
+    ALTER COLUMN country_name SET DEFAULT 'Türkiye'
   `);
   await sequelize.query(`
     CREATE INDEX IF NOT EXISTS historical_athlete_data_birth_year_gender_idx
@@ -113,6 +148,7 @@ async function importWorkbookFile(
   duplicateHashes: Map<string, DuplicateCandidateEntry>,
 ) {
   const workbook = XLSX.readFile(filePath, { cellDates: true });
+  const clubName = extractClubNameFromFilePath(filePath, TEST_FOLDER);
   let importedAnySheet = false;
 
   for (const sheetName of workbook.SheetNames) {
@@ -165,6 +201,10 @@ async function importWorkbookFile(
 
       if (!DRY_RUN) {
         await HistoricalAthleteData.create({
+          full_name: row.athleteName?.trim() || null,
+          club_name: clubName,
+          country_code: "TR",
+          country_name: "Türkiye",
           birth_year: row.birthYear!,
           gender: normalizeGender(row.gender),
           height: row.height ?? null,
@@ -218,6 +258,9 @@ async function main() {
     if (!DRY_RUN) {
       await sequelize.authenticate();
       await ensureHistoricalTableColumns();
+      if (TRUNCATE_FIRST) {
+        await sequelize.query("TRUNCATE TABLE historical_athlete_data RESTART IDENTITY");
+      }
     }
 
     const allFiles = await walkFiles(TEST_FOLDER);

@@ -8,6 +8,7 @@ import * as XLSX from "xlsx";
 import { HistoricalAthleteData } from "../models";
 import { normalizeGender } from "../config/gender";
 import {
+  extractClubNameFromFilePath,
   mapExcelRow,
   ParsedHistoricalRow,
 } from "../utils/historicalImport";
@@ -49,6 +50,7 @@ export const importHistoricalAthletes = async (req: Request, res: Response) => {
     const worksheet = workbook.Sheets[sheetName];
     const rawRows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(worksheet);
     const rows: ParsedHistoricalRow[] = rawRows.map(mapExcelRow);
+    const clubName = extractClubNameFromFilePath(req.file.originalname, req.file.originalname);
 
     let importedRows = 0;
     let skippedRows = 0;
@@ -70,6 +72,10 @@ export const importHistoricalAthletes = async (req: Request, res: Response) => {
 
       try {
         await HistoricalAthleteData.create({
+          full_name: row.athleteName?.trim() || null,
+          club_name: clubName,
+          country_code: "TR",
+          country_name: "Türkiye",
           birth_year: Number(row.birthYear),
           gender: normalizeGender(row.gender),
           height: row.height ?? null,
