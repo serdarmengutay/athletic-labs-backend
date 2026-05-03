@@ -1,7 +1,14 @@
 // MVP Test Sessions Controller
 import { Request, Response } from "express";
-import { TestSession, Athlete, AthleteTest, Measurement } from "../models";
-import { Op } from "sequelize";
+import {
+  TestSession,
+  Athlete,
+  AthleteTest,
+  Measurement,
+  XOneReportImport,
+  sequelize,
+} from "../models";
+import { Op, UniqueConstraintError } from "sequelize";
 import { normalizeGender } from "../config/gender";
 import {
   generateAthleteReport,
@@ -10,6 +17,8 @@ import {
   FrontendAthleteReport,
   NoBenchmarkDataError,
 } from "../services/calculationService";
+import { normalizeXOnePayload } from "../services/xOneImportService";
+import { parseYoujiuQrUrl, YoujiuApiClient } from "../services/youjiuClient";
 
 // Required measurement fields for marking test as complete
 const REQUIRED_MEASUREMENT_FIELDS = [
@@ -504,6 +513,242 @@ export const saveMeasurements = async (req: Request, res: Response) => {
     return res.status(500).json({
       success: false,
       message: "Ölçümler kaydedilirken hata oluştu",
+      error: error instanceof Error ? error.message : "Bilinmeyen hata",
+    });
+  }
+};
+
+/**
+ * POST /api/test-sessions/:testSessionId/x-one/import-qr
+ * Import Youjiu X-One report by QR URL and attach it to an athlete test.
+ */
+export const importXOneQr = async (req: Request, res: Response) => {
+  try {
+    const { testSessionId } = req.params;
+    const { athleteId, qrUrl } = req.body ?? {};
+
+    if (!athleteId || typeof athleteId !== "string") {
+      return res.status(400).json({
+        success: false,
+        message: "athleteId gerekli",
+        code: "MISSING_ATHLETE_ID",
+      });
+    }
+
+    if (!qrUrl || typeof qrUrl !== "string") {
+      return res.status(400).json({
+        success: false,
+        message: "qrUrl gerekli",
+        code: "MISSING_QR_URL",
+      });
+    }
+
+    const testSession = await TestSession.findByPk(testSessionId);
+    if (!testSession) {
+      return res.status(404).json({
+        success: false,
+        message: "Test oturumu bulunamadı",
+        code: "TEST_SESSION_NOT_FOUND",
+      });
+    }
+
+    const athleteTest = await AthleteTest.findOne({
+      where: {
+        test_session_id: testSessionId,
+        athlete_id: athleteId,
+      },
+      include: [{ association: "measurement" }],
+    });
+
+    if (!athleteTest) {
+      return res.status(404).json({
+        success: false,
+        message: "Bu test oturumunda sporcu bulunamadı",
+        code: "ATHLETE_TEST_NOT_FOUND",
+      });
+    }
+
+    let parsedQr;
+    try {
+      parsedQr = parseYoujiuQrUrl(qrUrl);
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error instanceof Error ? error.message : "Geçersiz QR URL",
+        code: "INVALID_QR_URL",
+      });
+    }
+
+    const existingImport = await XOneReportImport.findOne({
+      where: { report_id: parsedQr.reportId },
+    });
+
+    if (existingImport) {
+      return res.status(409).json({
+        success: false,
+        message: "Bu report_id daha önce içe aktarıldı",
+        code: "DUPLICATE_REPORT_ID",
+        data: {
+          reportId: existingImport.report_id,
+          athleteId: existingImport.athlete_id,
+          testSessionId: existingImport.test_session_id,
+        },
+      });
+    }
+
+    const client = new YoujiuApiClient();
+    const rawPayload = await client.getReportDetail({
+      measurementId: parsedQr.reportId,
+      token: parsedQr.token,
+      agentId: parsedQr.agentId,
+    });
+
+    if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+      return res.status(502).json({
+        success: false,
+        message: "Youjiu API beklenen JSON nesnesini döndürmedi",
+        code: "INVALID_YOUJIU_RESPONSE",
+      });
+    }
+
+    const normalized = normalizeXOnePayload(rawPayload);
+    const mappedMeasurementData: Record<string, number> = {};
+
+    if (normalized.metrics.height !== null) {
+      mappedMeasurementData.height = normalized.metrics.height;
+    }
+    if (normalized.metrics.weight !== null) {
+      mappedMeasurementData.weight = normalized.metrics.weight;
+    }
+    if (normalized.metrics.flexibility !== null) {
+      mappedMeasurementData.flexibility = normalized.metrics.flexibility;
+    }
+    if (normalized.metrics.sprint30m !== null) {
+      mappedMeasurementData.sprint_30m = normalized.metrics.sprint30m;
+    }
+    if (normalized.metrics.sprint30mSecond !== null) {
+      mappedMeasurementData.sprint_30m_second = normalized.metrics.sprint30mSecond;
+    }
+    if (normalized.metrics.agility !== null) {
+      mappedMeasurementData.agility = normalized.metrics.agility;
+    }
+    if (normalized.metrics.verticalJump !== null) {
+      mappedMeasurementData.vertical_jump = normalized.metrics.verticalJump;
+    }
+    if (normalized.metrics.passCount !== null) {
+      mappedMeasurementData.pass_count = normalized.metrics.passCount;
+    }
+    if (normalized.metrics.bmi !== null) {
+      mappedMeasurementData.bmi = normalized.metrics.bmi;
+    }
+    if (normalized.metrics.ffmi !== null) {
+      mappedMeasurementData.ffmi = normalized.metrics.ffmi;
+    }
+    if (normalized.metrics.fatigueIndex !== null) {
+      mappedMeasurementData.fatigue_index = normalized.metrics.fatigueIndex;
+    }
+
+    try {
+      const result = await sequelize.transaction(async (transaction) => {
+        const importedReport = await XOneReportImport.create(
+          {
+            test_session_id: testSessionId,
+            athlete_id: athleteId,
+            athlete_test_id: athleteTest.id,
+            report_id: parsedQr.reportId,
+            agent_id: parsedQr.agentId,
+            qr_token: parsedQr.token,
+            qr_url: parsedQr.qrUrl,
+            raw_payload: rawPayload,
+            composition: normalized.sections.composition,
+            measurement: normalized.sections.measurement,
+            posture: normalized.sections.posture,
+            balance: normalized.sections.balance,
+          },
+          { transaction },
+        );
+
+        let measurement = (athleteTest as any).measurement as Measurement | null;
+        if (!measurement) {
+          measurement = await Measurement.create(
+            {
+              athlete_test_id: athleteTest.id,
+              ...mappedMeasurementData,
+            },
+            { transaction },
+          );
+        } else if (Object.keys(mappedMeasurementData).length > 0) {
+          await measurement.update(mappedMeasurementData, { transaction });
+        }
+
+        if (measurement) {
+          await measurement.reload({ transaction });
+        }
+
+        const isComplete = measurement
+          ? REQUIRED_MEASUREMENT_FIELDS.every(
+              (field) =>
+                measurement![field as keyof Measurement] !== null &&
+                measurement![field as keyof Measurement] !== undefined,
+            )
+          : false;
+
+        if (isComplete && !athleteTest.is_completed) {
+          athleteTest.is_completed = true;
+          athleteTest.completed_at = new Date();
+          await athleteTest.save({ transaction });
+        }
+
+        if (testSession.status === "draft") {
+          testSession.status = "in_progress";
+          await testSession.save({ transaction });
+        }
+
+        return {
+          importedReport,
+          measurement,
+          isComplete,
+        };
+      });
+
+      return res.status(201).json({
+        success: true,
+        message: "Youjiu QR raporu başarıyla içe aktarıldı",
+        data: {
+          testSessionId,
+          athleteId,
+          athleteTestId: athleteTest.id,
+          reportId: parsedQr.reportId,
+          agentId: parsedQr.agentId,
+          hasQrToken: Boolean(parsedQr.token),
+          importId: result.importedReport.id,
+          measurementId: result.measurement?.id ?? null,
+          isComplete: result.isComplete,
+          normalized: normalized.metrics,
+          sections: {
+            composition: Boolean(normalized.sections.composition),
+            measurement: Boolean(normalized.sections.measurement),
+            posture: Boolean(normalized.sections.posture),
+            balance: Boolean(normalized.sections.balance),
+          },
+        },
+      });
+    } catch (error) {
+      if (error instanceof UniqueConstraintError) {
+        return res.status(409).json({
+          success: false,
+          message: "Bu report_id daha önce içe aktarıldı",
+          code: "DUPLICATE_REPORT_ID",
+        });
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error("importXOneQr error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Youjiu QR içe aktarımı sırasında hata oluştu",
+      code: "X_ONE_IMPORT_FAILED",
       error: error instanceof Error ? error.message : "Bilinmeyen hata",
     });
   }

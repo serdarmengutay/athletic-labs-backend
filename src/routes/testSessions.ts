@@ -8,6 +8,7 @@ import {
   getSessionAthletes,
   saveMeasurements,
   calculateReport,
+  importXOneQr,
 } from "../controllers/testSessionController";
 
 const router = Router();
@@ -24,5 +25,6 @@ router.post("/:id/calculate-report", calculateReport);
 // Athletes in session
 router.post("/:testSessionId/athletes", bulkImportAthletes);
 router.get("/:testSessionId/athletes", getSessionAthletes);
+router.post("/:testSessionId/x-one/import-qr", importXOneQr);
 
 export default router;

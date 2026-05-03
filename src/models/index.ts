@@ -6,6 +6,7 @@ import Athlete from "./Athlete";
 import AthleteTest from "./AthleteTest";
 import Measurement from "./Measurement";
 import HistoricalAthleteData from "./HistoricalAthleteData";
+import XOneReportImport from "./XOneReportImport";
 
 // TODO MVP: Commented out models - re-enable after MVP
 /*
@@ -47,6 +48,15 @@ AthleteTest.hasOne(Measurement, {
   as: "measurement",
 });
 Measurement.belongsTo(AthleteTest, {
+  foreignKey: "athlete_test_id",
+  as: "athleteTest",
+});
+
+AthleteTest.hasMany(XOneReportImport, {
+  foreignKey: "athlete_test_id",
+  as: "xOneImports",
+});
+XOneReportImport.belongsTo(AthleteTest, {
   foreignKey: "athlete_test_id",
   as: "athleteTest",
 });
@@ -156,6 +166,7 @@ export {
   AthleteTest,
   Measurement,
   HistoricalAthleteData,
+  XOneReportImport,
   // TODO MVP: Commented out exports
   // Club,
   // TestResult,
