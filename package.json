@@ -12,6 +12,8 @@
     "seed": "npx sequelize-cli db:seed:all",
     "seed:undo": "npx sequelize-cli db:seed:undo:all",
     "sync-db": "npx ts-node src/scripts/sync-database.ts",
+    "sync-schema": "npx ts-node src/scripts/sync-schema.ts",
+    "add-athlete-test-status": "npx ts-node src/scripts/add-athlete-test-status.ts",
     "create-stations": "npx ts-node src/scripts/create-stations.ts",
     "backfill-gender": "npx ts-node src/scripts/backfill-gender.ts",
     "import-test-folder": "npx ts-node src/scripts/import-test-folder.ts"

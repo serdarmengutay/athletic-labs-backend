@@ -28,9 +28,14 @@ import scoutingRoutes from "./routes/scouting";
 import authRoutes from "./routes/auth";
 import excelRoutes from "./routes/excel";
 import coachRoutes from "./routes/coaches";
+import youjiuPushRoutes from "./routes/youjiuPush";
 
 const app = express();
 const PORT = process.env.PORT || 5017;
+const allowedOrigins = (process.env.CORS_ORIGIN || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 // Middleware
 app.use(helmet());
@@ -38,7 +43,16 @@ app.use(compression());
 // CORS configuration - Allow all origins in development
 app.use(
   cors({
-    origin: true, // Allow all origins in development
+    origin:
+      allowedOrigins.length > 0
+        ? (origin, callback) => {
+            if (!origin || allowedOrigins.includes(origin)) {
+              callback(null, true);
+              return;
+            }
+            callback(new Error("Not allowed by CORS"));
+          }
+        : true,
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: [
@@ -71,6 +85,9 @@ app.get("/api", (req: Request, res: Response) => {
     status: "running",
   });
 });
+
+// Youjiu calls this endpoint from its own servers, so it must stay public.
+app.use("/api/youjiu/push", youjiuPushRoutes);
 
 // Apply Firebase auth middleware to all /api/* routes
 // TODO: Add role/permission checks here when needed

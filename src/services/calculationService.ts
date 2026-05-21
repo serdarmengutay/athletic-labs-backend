@@ -17,6 +17,10 @@ import {
   METRIC_CONFIG as BASE_METRIC_CONFIG,
   MetricConfigMap,
 } from "../config/metricConfig";
+import {
+  calculateFallbackScore,
+  getFallbackAverage,
+} from "../config/fallbackBenchmarks";
 
 // Metric configuration: which direction is "better"
 const METRIC_CONFIG: Record<string, { lowerIsBetter: boolean; label: string }> =
@@ -770,6 +774,74 @@ function calculateAgeGroupPercentiles(
   };
 }
 
+function buildFallbackInput(
+  athleteTest: any,
+  athlete: any,
+  metricKey: string,
+  value: number | null,
+) {
+  return {
+    birthYear: athlete.birth_year,
+    gender: athlete.gender as AthleteGender,
+    sportType: athleteTest.testSession?.sport_type,
+    metricKey,
+    value,
+  };
+}
+
+function applyFallbackAverages(
+  athleteTest: any,
+  athlete: any,
+  ageGroupAverages: FrontendAthleteReport["ageGroupAverages"],
+): FrontendAthleteReport["ageGroupAverages"] {
+  const fallbackAverage = (metricKey: string) =>
+    getFallbackAverage({
+      birthYear: athlete.birth_year,
+      gender: athlete.gender as AthleteGender,
+      sportType: athleteTest.testSession?.sport_type,
+      metricKey,
+    });
+  const fallbackHeight = fallbackAverage("height");
+  const fallbackWeight = fallbackAverage("weight");
+  const fallbackBmi =
+    fallbackHeight && fallbackWeight
+      ? calculateBMI(fallbackHeight, fallbackWeight)
+      : null;
+
+  return {
+    sprint1: ageGroupAverages.sprint1 ?? fallbackAverage("sprint_30m"),
+    sprint2:
+      ageGroupAverages.sprint2 ?? fallbackAverage("sprint_30m_second"),
+    agility: ageGroupAverages.agility ?? fallbackAverage("agility"),
+    flexibility:
+      ageGroupAverages.flexibility ?? fallbackAverage("flexibility"),
+    verticalJump:
+      ageGroupAverages.verticalJump ?? fallbackAverage("vertical_jump"),
+    passCount:
+      ageGroupAverages.passCount ??
+      (athlete.gender === "female"
+        ? null
+        : Number(
+            Math.max(
+              12,
+              Math.min(32, 10 + (new Date().getFullYear() - athlete.birth_year) * 1.15),
+            ).toFixed(0),
+          )),
+    bmi: ageGroupAverages.bmi ?? fallbackBmi,
+  };
+}
+
+function buildFallbackAverageScore(
+  athleteTest: any,
+  athlete: any,
+  metricKey: string,
+  averageValue: number | null,
+): number | null {
+  return calculateFallbackScore(
+    buildFallbackInput(athleteTest, athlete, metricKey, averageValue),
+  );
+}
+
 /**
  * Generate a frontend-compatible athlete report
  * Returns partial data with null percentiles if benchmark data is missing
@@ -866,17 +938,73 @@ export async function generateFrontendAthleteReport(
     comparison.metrics.map((metric) => [metric.metricKey, metric]),
   );
 
-  const ageGroupAverages = await buildAgeGroupAveragesFromDatabase(
+  const databaseAgeGroupAverages = await buildAgeGroupAveragesFromDatabase(
     athlete.birth_year,
     athleteGender,
     athleteTest.id,
   );
-  const ageGroupPercentiles = await buildAgeGroupAverageScores(
+  const ageGroupAverages = applyFallbackAverages(
+    athleteTest,
+    athlete,
+    databaseAgeGroupAverages,
+  );
+  const databaseAgeGroupPercentiles = await buildAgeGroupAverageScores(
     athlete.birth_year,
     athleteGender,
     athleteTest.id,
     ageGroupAverages,
   );
+  const ageGroupPercentiles: FrontendAthleteReport["ageGroupPercentiles"] = {
+    sprint1:
+      databaseAgeGroupPercentiles.sprint1 ??
+      buildFallbackAverageScore(
+        athleteTest,
+        athlete,
+        "sprint_30m",
+        ageGroupAverages.sprint1,
+      ),
+    sprint2:
+      databaseAgeGroupPercentiles.sprint2 ??
+      buildFallbackAverageScore(
+        athleteTest,
+        athlete,
+        "sprint_30m_second",
+        ageGroupAverages.sprint2,
+      ),
+    agility:
+      databaseAgeGroupPercentiles.agility ??
+      buildFallbackAverageScore(
+        athleteTest,
+        athlete,
+        "agility",
+        ageGroupAverages.agility,
+      ),
+    flexibility:
+      databaseAgeGroupPercentiles.flexibility ??
+      buildFallbackAverageScore(
+        athleteTest,
+        athlete,
+        "flexibility",
+        ageGroupAverages.flexibility,
+      ),
+    verticalJump:
+      databaseAgeGroupPercentiles.verticalJump ??
+      buildFallbackAverageScore(
+        athleteTest,
+        athlete,
+        "vertical_jump",
+        ageGroupAverages.verticalJump,
+      ),
+    passCount:
+      databaseAgeGroupPercentiles.passCount ??
+      buildFallbackAverageScore(
+        athleteTest,
+        athlete,
+        "pass_count",
+        ageGroupAverages.passCount,
+      ),
+    bmi: databaseAgeGroupPercentiles.bmi ?? null,
+  };
 
   const buildMetric = (
     value: number | null,
@@ -884,10 +1012,16 @@ export async function generateFrontendAthleteReport(
   ): MetricResult => {
     const result = metricResults[metricKey];
     const score =
-      result?.status === COMPARISON_RESULT_STATUS.SCORED ? result.score : null;
+      result?.status === COMPARISON_RESULT_STATUS.SCORED
+        ? result.score
+        : calculateFallbackScore(
+            buildFallbackInput(athleteTest, athlete, metricKey, value),
+          );
     const percentileRank =
       result?.status === COMPARISON_RESULT_STATUS.SCORED
         ? result.percentileRank
+        : score !== null
+        ? Number((100 - score).toFixed(1))
         : null;
 
     return {
@@ -917,7 +1051,19 @@ export async function generateFrontendAthleteReport(
     fatigueIndex: buildMetric(derived.fatigueIndex, "fatigue_index"),
   };
 
-  const overallPerformance = comparison.overall.overallPercentileRank ?? 0;
+  const scoredMetrics = Object.values(metrics)
+    .map((metric) => metric.score)
+    .filter((score): score is number => score !== null && score !== undefined);
+  const overallPerformance =
+    comparison.overall.overallPercentileRank ??
+    (scoredMetrics.length > 0
+      ? Number(
+          (
+            scoredMetrics.reduce((sum, score) => sum + score, 0) /
+            scoredMetrics.length
+          ).toFixed(1),
+        )
+      : 0);
 
   return {
     athleteId: athlete.id,

@@ -49,10 +49,10 @@ function calculateFfmiFromBodyFat(
 }
 
 const SECTION_ALIASES: Record<keyof NormalizedXOneSections, string[]> = {
-  composition: ["composition", "bodyComposition", "body_composition"],
-  measurement: ["measurement", "measurements", "metrics", "result", "results"],
-  posture: ["posture", "postures"],
-  balance: ["balance", "balances"],
+  composition: ["composition", "Composition", "bodyComposition", "body_composition"],
+  measurement: ["measurement", "Measurement", "measurements", "metrics", "result", "results"],
+  posture: ["posture", "Posture", "postures"],
+  balance: ["balance", "Balance", "balances"],
 };
 
 const METRIC_CANDIDATES: Record<keyof Omit<NormalizedXOneMetrics, "bmi" | "ffmi" | "fatigueIndex">, string[]> =
@@ -107,6 +107,7 @@ function findSection(
   rawPayload: Record<string, any>,
   aliases: string[],
 ): Record<string, any> | null {
+  const normalizedAliases = aliases.map(normalizeKey);
   for (const alias of aliases) {
     const directValue = rawPayload[alias];
     if (isPlainObject(directValue)) {
@@ -120,7 +121,7 @@ function findSection(
     if (!isPlainObject(current)) continue;
 
     for (const [key, value] of Object.entries(current)) {
-      if (aliases.includes(key) && isPlainObject(value)) {
+      if (normalizedAliases.includes(normalizeKey(key)) && isPlainObject(value)) {
         return value;
       }
       if (isPlainObject(value) || Array.isArray(value)) {
@@ -177,7 +178,11 @@ function getFirstNumericValue(
 export function normalizeXOnePayload(
   rawPayload: Record<string, any>,
 ): NormalizedXOnePayload {
-  const payloadData = isPlainObject(rawPayload.data) ? rawPayload.data : rawPayload;
+  const payloadData = isPlainObject(rawPayload.data)
+    ? rawPayload.data
+    : isPlainObject(rawPayload.result)
+      ? rawPayload.result
+      : rawPayload;
 
   const sections: NormalizedXOneSections = {
     composition: findSection(payloadData, SECTION_ALIASES.composition),

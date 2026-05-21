@@ -1,0 +1,3361 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "佑久健康数据开放平台接口【服务商版】",
+    "description": "本接口为佑久健康授权服务商提供开放体测数据,使用 <a href='https://jwt.io/'>JWT</a> 认证，推送相关请参考 <a href='http://doc.wx3city.com/open/api/推送接口文档-V3.pdf'>推送接口文档-V3.pdf</a>",
+    "version": "3.0.1"
+  },
+  "servers": [
+    {
+      "url": "https://open.youjiuhealth.com/mch/v3",
+      "description": "服务商端正式环境接口"
+    }
+  ],
+  "paths": {
+    "/session": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Get access token",
+        "description": "请求 Token",
+        "operationId": "App\\Http\\Controllers\\Api\\V2\\AuthController::login",
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "query",
+            "description": "APP ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "app_secret",
+            "in": "query",
+            "description": "APP SECRET",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/vnd.XoneAPI.v3+json": {
+                "schema": {
+                  "properties": {
+                    "access_token": {
+                      "type": "string",
+                      "description": "访问token",
+                      "example": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczpcL1web3Blb055b3VqaXVoZWFsdGguY29tXC9tY2hcL3Nlc3Npb24iLCJpYXQiOjE1NTgzMTQ5MjksImV4cCI6MTU1ODMxODUyOSwibmJmIjoxNTU4MzE0OTI5LCJqdGkiOiI4VU4zaEVGeDNQNzMwRndYIiwic3ViIjoxMDA1NywicHJ2IjoiZGMwOTQ0NWY1ZTAzMjg4OTczYWRlMTUzOGE5YWViYTJlMmZjYWRlMyJ9.7EbxOOdJUMV6DraX1rQH2Dz1o93-sI_3WyDGtE6Sp6E"
+                    },
+                    "token_type": {
+                      "type": "string",
+                      "description": "token类型",
+                      "example": "bearer"
+                    },
+                    "expires_in": {
+                      "type": "integer",
+                      "description": "token有效时间（单位：秒）",
+                      "example": "3600"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/clients": {
+      "get": {
+        "tags": [
+          "Client"
+        ],
+        "summary": "Get client list",
+        "description": "获取客户列表",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/vnd.XoneAPI.v3+json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "description": "商户列表数据",
+                      "items": {
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "description": "商家ID",
+                            "example": "3217740"
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "商家名称",
+                            "example": "佑久健身俱乐部"
+                          }
+                        }
+                      }
+                    },
+                    "meta": {
+                      "properties": {
+                        "pagination": {
+                          "properties": {
+                            "total": {
+                              "type": "integer"
+                            },
+                            "count": {
+                              "type": "integer"
+                            },
+                            "per_page": {
+                              "type": "integer"
+                            },
+                            "current_page": {
+                              "type": "integer"
+                            },
+                            "total_pages": {
+                              "type": "integer"
+                            },
+                            "links": {
+                              "properties": {
+                                "next": {
+                                  "type": "string",
+                                  "format": "uri"
+                                }
+                              },
+                              "type": "object"
+                            }
+                          },
+                          "type": "object"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/clients/{client_id}/devices": {
+      "get": {
+        "tags": [
+          "Client"
+        ],
+        "summary": "Get client devices list",
+        "description": "获取客户设备列表",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "client_id",
+            "in": "path",
+            "description": "商家ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/vnd.XoneAPI.v3+json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "description": "商户列表数据",
+                      "items": {
+                        "properties": {
+                          "sn": {
+                            "type": "integer",
+                            "description": "设备SN",
+                            "example": "1103251811650"
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "设备所在地",
+                            "example": "上海市嘉定区创业一路西城上筑华润万家6楼"
+                          }
+                        }
+                      }
+                    },
+                    "meta": {
+                      "properties": {
+                        "pagination": {
+                          "properties": {
+                            "total": {
+                              "type": "integer"
+                            },
+                            "count": {
+                              "type": "integer"
+                            },
+                            "per_page": {
+                              "type": "integer"
+                            },
+                            "current_page": {
+                              "type": "integer"
+                            },
+                            "total_pages": {
+                              "type": "integer"
+                            },
+                            "links": {
+                              "properties": {
+                                "next": {
+                                  "type": "string",
+                                  "format": "uri"
+                                }
+                              },
+                              "type": "object"
+                            }
+                          },
+                          "type": "object"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/clients/sendBindApplication": {
+      "post": {
+        "tags": [
+          "Client"
+        ],
+        "summary": "向商户发送绑定申请",
+        "description": "向商户发送绑定申请",
+        "parameters": [
+          {
+            "name": "sn",
+            "in": "query",
+            "description": "设备SN",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/vnd.XoneAPI.v3+json": {
+                "schema": {
+                  "properties": {
+                    "message": {
+                      "description": "提示信息",
+                      "type": "string",
+                      "example": "验证码已发送"
+                    },
+                    "code": {
+                      "description": "发送状态（0：成功）",
+                      "type": "integer",
+                      "example": 0
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/clients/sendBindingMsg": {
+      "post": {
+        "tags": [
+          "Client"
+        ],
+        "summary": "发送服务商请求绑定商户短信",
+        "description": "发送服务商请求绑定商户短信",
+        "parameters": [
+          {
+            "name": "account",
+            "in": "query",
+            "description": "账号（暂时只支持手机号）",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "sn",
+            "in": "query",
+            "description": "设备SN",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/vnd.XoneAPI.v3+json": {
+                "schema": {
+                  "properties": {
+                    "message": {
+                      "description": "提示信息",
+                      "type": "string",
+                      "example": "验证码已发送"
+                    },
+                    "code": {
+                      "description": "发送状态（0：成功）",
+                      "type": "integer",
+                      "example": 0
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/clients/binding": {
+      "post": {
+        "tags": [
+          "Client"
+        ],
+        "summary": "验证并绑定商户到当前服务商",
+        "description": "验证并绑定商户到当前服务商",
+        "parameters": [
+          {
+            "name": "account",
+            "in": "query",
+            "description": "账号（暂时只支持手机号）",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "vscode",
+            "in": "query",
+            "description": "验证码",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/vnd.XoneAPI.v3+json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "description": "绑定成功（0：成功）",
+                      "type": "integer",
+                      "example": 0
+                    },
+                    "message": {
+                      "description": "提示信息",
+                      "type": "string",
+                      "example": "绑定成功"
+                    },
+                    "client_info": {
+                      "description": "设备所在商户基本信息",
+                      "properties": {
+                        "client_id": {
+                          "description": "商户ID",
+                          "example": 965421,
+                          "type": "integer"
+                        },
+                        "client_name": {
+                          "description": "商户名称",
+                          "example": "佑久健身",
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/clients/unbind": {
+      "post": {
+        "tags": [
+          "Client"
+        ],
+        "summary": "服务商解绑指定商户",
+        "description": "服务商解绑指定商户",
+        "parameters": [
+          {
+            "name": "client_id",
+            "in": "query",
+            "description": "商户ID",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/vnd.XoneAPI.v3+json": {
+                "schema": {
+                  "properties": {
+                    "message": {
+                      "description": "提示信息",
+                      "type": "string",
+                      "example": "解绑成功"
+                    },
+                    "code": {
+                      "description": "解绑成功（0：成功）",
+                      "type": "integer",
+                      "example": 0
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/devices/{sn}": {
+      "get": {
+        "tags": [
+          "devices"
+        ],
+        "summary": "获取sn关联信息",
+        "description": "获取设备信息",
+        "parameters": [
+          {
+            "name": "sn",
+            "in": "path",
+            "description": "SN",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/vnd.XoneAPI.v3+json": {
+                "schema": {
+                  "properties": {
+                    "device_info": {
+                      "description": "设备基础信息",
+                      "properties": {
+                        "pro_name": {
+                          "description": "产品类别",
+                          "example": "xone-pro",
+                          "type": "string"
+                        },
+                        "model_no": {
+                          "description": "产品型号",
+                          "example": "X-ONE PRO 3TW02",
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "client_info": {
+                      "description": "设备所在商户基本信息",
+                      "properties": {
+                        "client_id": {
+                          "description": "商户ID",
+                          "example": 965421,
+                          "type": "integer"
+                        },
+                        "client_name": {
+                          "description": "商户名称",
+                          "example": "佑久健身",
+                          "type": "string"
+                        },
+                        "administrator_account": {
+                          "description": "管理员账号",
+                          "example": "139****0450",
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reports": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Finds reports by conditions",
+        "description": "按条件查询报告列表（至少提供一个条件）",
+        "operationId": "findReportsByConditions",
+        "parameters": [
+          {
+            "name": "phone",
+            "in": "query",
+            "description": "输入的手机号",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "device_sn",
+            "in": "query",
+            "description": "体测设备 SN",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "attachment_id",
+            "in": "query",
+            "description": "附件 ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "client_id",
+            "in": "query",
+            "description": "商家ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "attachment_rom",
+            "in": "query",
+            "description": "urlEncode后的附件扇区数据",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "agent_id",
+            "in": "query",
+            "description": "max设备传3，其他可省略或传1",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/vnd.XoneAPI.v3+json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "properties": {
+                          "measurement": {
+                            "$ref": "#/components/schemas/MeasTransformer"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "meta": {
+                      "properties": {
+                        "pagination": {
+                          "properties": {
+                            "total": {
+                              "type": "integer"
+                            },
+                            "count": {
+                              "type": "integer"
+                            },
+                            "per_page": {
+                              "type": "integer"
+                            },
+                            "current_page": {
+                              "type": "integer"
+                            },
+                            "total_pages": {
+                              "type": "integer"
+                            },
+                            "links": {
+                              "properties": {
+                                "next": {
+                                  "type": "string",
+                                  "format": "uri"
+                                }
+                              },
+                              "type": "object"
+                            }
+                          },
+                          "type": "object"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid status value"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/reports/{measurementId}": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Find report by measurementId",
+        "description": "根据体测 ID 获取报告及各项目详情",
+        "operationId": "getReportByMeasurementId",
+        "parameters": [
+          {
+            "name": "measurementId",
+            "in": "path",
+            "description": "ID of measurement",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "agent_id",
+            "in": "query",
+            "description": "max设备传3，其他可省略或传1",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/vnd.XoneAPI.v3+json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "properties": {
+                        "measurement": {
+                          "$ref": "#/components/schemas/MeasTransformer"
+                        },
+                        "comprehensive_assessment": {
+                          "$ref": "#/components/schemas/ComprehensiveAssessmentTransformer"
+                        },
+                        "composition": {
+                          "$ref": "#/components/schemas/CompositionTransformer"
+                        },
+                        "posture": {
+                          "$ref": "#/components/schemas/PostureTransformer"
+                        },
+                        "girth": {
+                          "$ref": "#/components/schemas/GirthTransformer"
+                        },
+                        "balance": {
+                          "$ref": "#/components/schemas/BalanceTransformer"
+                        },
+                        "postpartum": {
+                          "$ref": "#/components/schemas/PostpartumTransformer"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID supplier"
+          },
+          "404": {
+            "description": "Pet not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/reports/{measurementId}/miniProgramCode": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "parameters": [
+          {
+            "name": "measurementId",
+            "in": "path",
+            "description": "ID of measurement",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "summary": "Get mini program code",
+        "description": "获取报告小程序码",
+        "operationId": "App\\Http\\Controllers\\Api\\V2\\ReportController::getMiniProgramCode",
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/vnd.XoneAPI.v3+json": {
+                "schema": {
+                  "properties": {
+                    "wxacode_url": {
+                      "type": "string",
+                      "example": "http://open.cc/wxacode/2018/11/16/103/22d88141c05fbfa2ba4aabb611fca722.jpg"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/reports/{measurementId}/model-url": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Get model url",
+        "description": "获取报告3D模型访问链接",
+        "operationId": "App\\Http\\Controllers\\Api\\V2\\ReportController::getModelUrl",
+        "parameters": [
+          {
+            "name": "measurementId",
+            "in": "path",
+            "description": "ID of measurement",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "agent_id",
+            "in": "query",
+            "description": "max设备传3，其他可省略或传1",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "weight_unit",
+            "in": "query",
+            "description": "重量单位：kg、lbs",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "length_unit",
+            "in": "query",
+            "description": "长度单位：cm、in",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lang",
+            "in": "query",
+            "description": "语言：zh、tr、en 等",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "modelVersion",
+            "in": "query",
+            "description": "模型类型：chinese、international、internationalClothes",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/vnd.XoneAPI.v2+json": {
+                "schema": {
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "example": "https://static-redirect.youjiuhealth.com/3d_model_viewer/index.html#/pages/yoga/somatotype-regulation/somatotype-regulation?encode_data=xxxxxxxx"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "当前设备/报告类型不支持模型预览"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "MeasTransformer": {
+        "title": "measurement - 体测[报告概要信息]",
+        "properties": {
+          "id": {
+            "description": "测试 ID",
+            "type": "string",
+            "example": "3905166"
+          },
+          "ca_id": {
+            "description": "综合评估 ID",
+            "type": "integer",
+            "example": 3146703
+          },
+          "client_id": {
+            "description": "商户 ID",
+            "type": "string",
+            "example": "9227640"
+          },
+          "device_sn": {
+            "description": "测试设备 SN 码",
+            "type": "string",
+            "example": "11042618days0"
+          },
+          "pro_name": {
+            "description": "报告归属产品名称：<br>@xone：XONE+<br>@xone-pro：XONE-PRO",
+            "type": "string",
+            "example": "xone-pro"
+          },
+          "version_no": {
+            "description": "测试时设备版本号",
+            "type": "string",
+            "example": "1.04.0605"
+          },
+          "third_uid": {
+            "description": "三方登录用户UID",
+            "type": "string",
+            "example": "9001"
+          },
+          "extend_data": {
+            "description": "三方登录用户登录用户扩展信息",
+            "type": "string",
+            "example": "9d29eaf697b4d04fe305e34cd26d11e2"
+          },
+          "phone": {
+            "description": "测试账号ID（不限于手机号）",
+            "type": "string",
+            "example": "17077362886"
+          },
+          "height": {
+            "description": "测试输入身高(cm)",
+            "type": "number",
+            "example": 182
+          },
+          "weight": {
+            "description": "测试输入体重(kg)",
+            "type": "number",
+            "example": "0.0"
+          },
+          "gender": {
+            "description": "测试输入性别(@1:男@2:女)",
+            "type": "integer",
+            "example": 1
+          },
+          "age": {
+            "description": "测试输入年龄",
+            "type": "integer",
+            "example": 0
+          },
+          "score": {
+            "description": "体成分风险等级@1:健康@2:低风险@3:中风险@4:高风险",
+            "type": "integer",
+            "example": 1
+          },
+          "score_constitute": {
+            "title": "综合评分及构成（仅U+设备有效）",
+            "properties": {
+              "composition": {
+                "description": "体成分得分",
+                "type": "number",
+                "example": 40
+              },
+              "pelvis": {
+                "description": "骨盆得分",
+                "type": "number",
+                "example": 8
+              },
+              "postpartum": {
+                "description": "产后评估得分",
+                "type": "number",
+                "example": 4
+              },
+              "score": {
+                "description": "总分",
+                "type": "number",
+                "example": 52
+              }
+            },
+            "type": "object"
+          },
+          "outline": {
+            "title": "测试结果概要",
+            "description": "冗余的结果详情关键数据，以便对接简版报告（仅体成分提供，对接详情可忽略）",
+            "properties": {
+              "bmi": {
+                "description": "body_mass_index-身体质量指数",
+                "type": "number",
+                "example": 20.9
+              },
+              "smm_control": {
+                "description": "肌肉调节量(kg)【注：其对应体成分字段muscle_control】",
+                "type": "number",
+                "example": 0
+              },
+              "bfm_control": {
+                "description": "脂肪调节量(kg)【注：其对应体成分字段fat_control】",
+                "type": "number",
+                "example": 0
+              },
+              "smm": {
+                "description": "skeletal_muscle_mass-骨骼肌(kg)",
+                "type": "number",
+                "example": 26.2
+              },
+              "pbf": {
+                "description": "percent_body_fat-体脂百分比(%)",
+                "type": "number",
+                "example": 17.2
+              },
+              "muscle": {
+                "description": "肌肉量(kg)",
+                "type": "number",
+                "example": 42.5
+              },
+              "bfm": {
+                "description": "脂肪量(kg)【注：其对应体成分字段fat】",
+                "type": "number",
+                "example": 9.6
+              },
+              "vfi": {
+                "description": "内脏脂肪(kg)",
+                "type": "number",
+                "example": 1
+              },
+              "bmr": {
+                "description": "基础代谢(kcal)",
+                "type": "number",
+                "example": 1362
+              },
+              "cbc": {
+                "description": "总能量消耗(kcal)【注：其对应体成分字段tee】",
+                "type": "number",
+                "example": 2179.1
+              },
+              "body_age": {
+                "description": "身体年龄(岁)",
+                "type": "number",
+                "example": 19
+              }
+            },
+            "type": "object"
+          },
+          "login_type": {
+            "description": "登录方式，<a target='_blank' href='https://github.com/youjiuhealth/doc-attribute/blob/master/report-attribute.md#login_type-%E7%99%BB%E5%BD%95%E7%B1%BB%E5%9E%8B'>明细</a>",
+            "type": "integer",
+            "example": 0
+          },
+          "start_time": {
+            "description": "测试时间",
+            "type": "string",
+            "format": "date",
+            "example": "2018-06-01 05:30:01"
+          },
+          "inclusion": {
+            "description": "报告内容标识，<a target='_blank' href='https://github.com/youjiuhealth/doc-attribute/blob/master/report-attribute.md#inclusion-%E6%9C%AC%E6%AC%A1%E6%B5%8B%E9%87%8F%E5%AE%8C%E6%88%90%E7%9A%84%E9%A1%B9%E7%9B%AE'>明细</a>",
+            "type": "integer",
+            "example": 2
+          }
+        },
+        "type": "object"
+      },
+      "ComprehensiveAssessmentTransformer": {
+        "title": "comprehensive_assessment - 综合评估[报告关联信息]",
+        "properties": {
+          "ca_id": {
+            "description": "综合评估 ID",
+            "type": "integer",
+            "example": 3146703
+          },
+          "inclusion": {
+            "description": "报告内容标识，<a target='_blank' href='https://github.com/youjiuhealth/doc-attribute/blob/master/report-attribute.md#inclusion-%E6%9C%AC%E6%AC%A1%E6%B5%8B%E9%87%8F%E5%AE%8C%E6%88%90%E7%9A%84%E9%A1%B9%E7%9B%AE'>明细</a>",
+            "type": "integer",
+            "example": 5
+          },
+          "type": {
+            "description": "类型（当前仅3t类型）",
+            "type": "string",
+            "example": "3t"
+          },
+          "meas_posture_id": {
+            "description": "姿态筛查报告ID",
+            "type": "integer",
+            "example": 3146703
+          },
+          "meas_posture_local_id": {
+            "description": "姿态筛查报告本地ID",
+            "type": "string",
+            "example": "9b563587-087c-4ad7-874d-03f67907321e"
+          },
+          "meas_posture_time": {
+            "description": "姿态筛查测试时间",
+            "type": "string",
+            "example": "2020-12-01 19:42:34"
+          },
+          "meas_composition_id": {
+            "description": "体成分报告ID",
+            "type": "integer",
+            "example": 3146702
+          },
+          "meas_composition_local_id": {
+            "description": "体成分报告本地ID",
+            "type": "string",
+            "example": "9b563587-087c-4ad7-874d-03f67907325e"
+          },
+          "meas_composition_time": {
+            "description": "体成分报告测试时间",
+            "type": "string",
+            "example": "2020-12-01 19:40:34"
+          }
+        }
+      },
+      "CompositionTransformer": {
+        "title": "composition - 体成分[报告数据]",
+        "properties": {
+          "weight": {
+            "title": "体重",
+            "properties": {
+              "value": {
+                "description": "测试值(kg)",
+                "type": "number",
+                "example": 66.7
+              },
+              "grade": {
+                "description": "评估等级@1偏低:@2正常:@3:偏高",
+                "type": "integer",
+                "example": 2
+              },
+              "prv": {
+                "title": "personal_reference_value-个人参考值",
+                "type": "array",
+                "items": {
+                  "description": "区间",
+                  "type": "number"
+                },
+                "example": "[57.2,69.9]"
+              },
+              "forecast_more": {
+                "title": "儿童未来预测（仅MAX设备有效）",
+                "type": "array",
+                "items": {
+                  "description": "区间",
+                  "type": "number"
+                },
+                "example": "[22.3,23.8,24.9,25.5,25.7,25.9,26]"
+              }
+            },
+            "type": "object"
+          },
+          "height": {
+            "title": "身高",
+            "properties": {
+              "forecast_more": {
+                "title": "儿童未来预测（仅MAX设备有效）",
+                "type": "array",
+                "items": {
+                  "description": "区间",
+                  "type": "number"
+                },
+                "example": "[167.9,173.7,177.4,179.5,180.4,180.9,181.5]"
+              }
+            },
+            "type": "object"
+          },
+          "fat": {
+            "title": "脂肪量",
+            "properties": {
+              "value": {
+                "description": "测试值(kg)",
+                "type": "number"
+              },
+              "grade": {
+                "description": "评估等级@1偏低:@2正常:@3:偏高",
+                "type": "integer"
+              },
+              "prv": {
+                "title": "personal_reference_value-个人参考值",
+                "type": "array",
+                "items": {
+                  "description": "区间",
+                  "type": "number"
+                }
+              }
+            },
+            "type": "object",
+            "example": "{value:13.4,grade:2,prv:[9.8,15.2]}"
+          },
+          "ffm": {
+            "title": "去脂体重-fat_free_mass",
+            "properties": {
+              "value": {
+                "description": "测试值(kg)",
+                "type": "number"
+              },
+              "grade": {
+                "description": "评估等级@1偏低:@2正常:@6:偏高",
+                "type": "integer"
+              },
+              "prv": {
+                "title": "personal_reference_value-个人参考值",
+                "type": "array",
+                "items": {
+                  "description": "区间",
+                  "type": "number"
+                }
+              }
+            },
+            "type": "object",
+            "example": "{value:35.3,grade:1,prv:[39.2,44.6]}"
+          },
+          "mineral": {
+            "title": "无机盐",
+            "properties": {
+              "value": {
+                "description": "测试值(kg)",
+                "type": "number"
+              },
+              "grade": {
+                "description": "评估等级@1不足:@2一般:@3:充足",
+                "type": "integer"
+              },
+              "prv": {
+                "title": "personal_reference_value-个人参考值",
+                "type": "array",
+                "items": {
+                  "description": "区间",
+                  "type": "number"
+                }
+              }
+            },
+            "type": "object",
+            "example": "{value:2.5,grade:1,prv:[2.7,3.1]}"
+          },
+          "muscle": {
+            "title": "肌肉量",
+            "properties": {
+              "value": {
+                "description": "测试值(kg)",
+                "type": "number"
+              },
+              "grade": {
+                "description": "评估等级@1不足:@2一般:@3:充足",
+                "type": "integer"
+              },
+              "prv": {
+                "title": "personal_reference_value-个人参考值",
+                "type": "array",
+                "items": {
+                  "description": "区间",
+                  "type": "number"
+                }
+              }
+            },
+            "type": "object",
+            "example": "{value:32.8,grade:1,prv:[36.4,41.5]}"
+          },
+          "protein": {
+            "title": "蛋白质",
+            "properties": {
+              "value": {
+                "description": "测试值(kg)",
+                "type": "number"
+              },
+              "grade": {
+                "description": "评估等级@1不足:@2一般:@3:充足",
+                "type": "integer"
+              },
+              "prv": {
+                "title": "personal_reference_value-个人参考值",
+                "type": "array",
+                "items": {
+                  "description": "区间",
+                  "type": "number"
+                }
+              }
+            },
+            "type": "object",
+            "example": "{value:7.3,grade:1,prv:[7.8,8.9]}"
+          },
+          "tbw": {
+            "title": "身体总水分-total_body_water",
+            "properties": {
+              "value": {
+                "description": "测试值(kg)",
+                "type": "number"
+              },
+              "grade": {
+                "description": "评估等级@1偏低:@2正常:@3:偏高",
+                "type": "integer"
+              },
+              "prv": {
+                "title": "personal_reference_value-个人参考值",
+                "type": "array",
+                "items": {
+                  "description": "区间",
+                  "type": "number"
+                }
+              }
+            },
+            "type": "object",
+            "example": "{value:25.5,grade:1,prv:[28.6,32.6]}"
+          },
+          "segmental_muscle": {
+            "title": "节段肌肉量",
+            "properties": {
+              "ra": {
+                "title": "右臂-right_arm",
+                "properties": {
+                  "value": {
+                    "description": "测试值(kg)",
+                    "type": "number"
+                  },
+                  "grade": {
+                    "description": "评估等级@1不足:@2一般:@3:充足",
+                    "type": "integer"
+                  },
+                  "prv": {
+                    "title": "personal_reference_value-个人参考值",
+                    "type": "array",
+                    "items": {
+                      "description": "区间",
+                      "type": "number"
+                    }
+                  }
+                },
+                "type": "object"
+              },
+              "la": {
+                "title": "左臂-left_arm",
+                "properties": {
+                  "value": {
+                    "description": "测试值(kg)",
+                    "type": "number"
+                  },
+                  "grade": {
+                    "description": "评估等级@1不足:@2一般:@3:充足",
+                    "type": "integer"
+                  },
+                  "prv": {
+                    "title": "personal_reference_value-个人参考值",
+                    "type": "array",
+                    "items": {
+                      "description": "区间",
+                      "type": "number"
+                    }
+                  }
+                },
+                "type": "object"
+              },
+              "tr": {
+                "title": "躯干-trunk",
+                "properties": {
+                  "value": {
+                    "description": "测试值(kg)",
+                    "type": "number"
+                  },
+                  "grade": {
+                    "description": "评估等级@1不足:@2一般:@3:充足",
+                    "type": "integer"
+                  },
+                  "prv": {
+                    "title": "personal_reference_value-个人参考值",
+                    "type": "array",
+                    "items": {
+                      "description": "区间",
+                      "type": "number"
+                    }
+                  }
+                },
+                "type": "object"
+              },
+              "rl": {
+                "title": "右腿-right_leg",
+                "properties": {
+                  "value": {
+                    "description": "测试值(kg)",
+                    "type": "number"
+                  },
+                  "grade": {
+                    "description": "评估等级@1不足:@2一般:@3:充足",
+                    "type": "integer"
+                  },
+                  "prv": {
+                    "title": "personal_reference_value-个人参考值",
+                    "type": "array",
+                    "items": {
+                      "description": "区间",
+                      "type": "number"
+                    }
+                  }
+                },
+                "type": "object"
+              },
+              "ll": {
+                "title": "左腿-left_leg",
+                "properties": {
+                  "value": {
+                    "description": "测试值(kg)",
+                    "type": "number"
+                  },
+                  "grade": {
+                    "description": "评估等级@1不足:@2一般:@3:充足",
+                    "type": "integer"
+                  },
+                  "prv": {
+                    "title": "personal_reference_value-个人参考值",
+                    "type": "array",
+                    "items": {
+                      "description": "区间",
+                      "type": "number"
+                    }
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object",
+            "example": "{ra:{value:1.4,grade:1,prv:[1.5,1.8]},la:{value:1.3,grade:1,prv:[1.5,1.8]},tr:{value:14.7,grade:1,prv:[16.6,20.2]},rl:{value:5.7,grade:2,prv:[5.7,6.9]},ll:{value:5.8,grade:2,prv:[5.7,6.9]}}"
+          },
+          "segmental_fat": {
+            "title": "节段脂肪量",
+            "properties": {
+              "ra": {
+                "title": "右臂-right_arm",
+                "properties": {
+                  "value": {
+                    "description": "测试值(kg)",
+                    "type": "number"
+                  },
+                  "grade": {
+                    "description": "评估等级@1偏低:@2正常:@3:偏高",
+                    "type": "integer"
+                  },
+                  "prv": {
+                    "title": "personal_reference_value-个人参考值",
+                    "type": "array",
+                    "items": {
+                      "description": "区间",
+                      "type": "number"
+                    }
+                  }
+                },
+                "type": "object"
+              },
+              "la": {
+                "title": "左臂-left_arm",
+                "properties": {
+                  "value": {
+                    "description": "测试值(kg)",
+                    "type": "number"
+                  },
+                  "grade": {
+                    "description": "评估等级@1偏低:@2正常:@3:偏高",
+                    "type": "integer"
+                  },
+                  "prv": {
+                    "title": "personal_reference_value-个人参考值",
+                    "type": "array",
+                    "items": {
+                      "description": "区间",
+                      "type": "number"
+                    }
+                  }
+                },
+                "type": "object"
+              },
+              "tr": {
+                "title": "躯干-trunk",
+                "properties": {
+                  "value": {
+                    "description": "测试值(kg)",
+                    "type": "number"
+                  },
+                  "grade": {
+                    "description": "评估等级@1偏低:@2正常:@3:偏高",
+                    "type": "integer"
+                  },
+                  "prv": {
+                    "title": "personal_reference_value-个人参考值",
+                    "type": "array",
+                    "items": {
+                      "description": "区间",
+                      "type": "number"
+                    }
+                  }
+                },
+                "type": "object"
+              },
+              "rl": {
+                "title": "右腿-right_leg",
+                "properties": {
+                  "value": {
+                    "description": "测试值(kg)",
+                    "type": "number"
+                  },
+                  "grade": {
+                    "description": "评估等级@1偏低:@2正常:@3:偏高",
+                    "type": "integer"
+                  },
+                  "prv": {
+                    "title": "personal_reference_value-个人参考值",
+                    "type": "array",
+                    "items": {
+                      "description": "区间",
+                      "type": "number"
+                    }
+                  }
+                },
+                "type": "object"
+              },
+              "ll": {
+                "title": "左腿-left_leg",
+                "properties": {
+                  "value": {
+                    "description": "测试值(kg)",
+                    "type": "number"
+                  },
+                  "grade": {
+                    "description": "评估等级@1偏低:@2正常:@3:偏高",
+                    "type": "integer"
+                  },
+                  "prv": {
+                    "title": "personal_reference_value-个人参考值",
+                    "type": "array",
+                    "items": {
+                      "description": "区间",
+                      "type": "number"
+                    }
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object",
+            "example": "{ra:{value:1.12,grade:2,prv:[0.78,1.22]},la:{value:1.06,grade:2,prv:[0.78,1.22]},tr:{value:6.2,grade:2,prv:[4.2,6.6]},rl:{value:2.4,grade:2,prv:[2,3]},ll:{value:2.3,grade:2,prv:[2,3]}}"
+          },
+          "whfr": {
+            "title": "腰臀脂肪比",
+            "properties": {
+              "value": {
+                "description": "测试值",
+                "type": "number"
+              },
+              "grade": {
+                "description": "评估等级@1偏低:@2正常:@3:偏高",
+                "type": "integer"
+              },
+              "prv": {
+                "title": "personal_reference_value-个人参考值",
+                "type": "array",
+                "items": {
+                  "description": "区间",
+                  "type": "number"
+                }
+              }
+            },
+            "type": "object",
+            "example": "{value:0.73,grade:1,prv:[0.75,0.85]}"
+          },
+          "pbf": {
+            "title": "体脂率-percent_body_fat",
+            "properties": {
+              "value": {
+                "description": "测试值(%)",
+                "type": "number"
+              },
+              "grade": {
+                "description": "评估等级@1偏低:@2正常:@3:偏高",
+                "type": "integer"
+              },
+              "prv": {
+                "title": "personal_reference_value-个人参考值",
+                "type": "array",
+                "items": {
+                  "description": "区间",
+                  "type": "number"
+                }
+              }
+            },
+            "type": "object",
+            "example": "{value:27.6,grade:2,prv:[18,28]}"
+          },
+          "smm": {
+            "title": "骨骼肌-skeletal_muscle_mass",
+            "properties": {
+              "value": {
+                "description": "测试值(kg)",
+                "type": "number"
+              },
+              "grade": {
+                "description": "评估等级@1不足:@2一般:@3:充足",
+                "type": "integer"
+              },
+              "prv": {
+                "title": "personal_reference_value-个人参考值",
+                "type": "array",
+                "items": {
+                  "description": "区间",
+                  "type": "number"
+                }
+              }
+            },
+            "type": "object",
+            "example": "{value:18.6,grade:1,prv:[19.8,24.3]}"
+          },
+          "vfi": {
+            "title": "内脏脂肪指数-visceral_fat_index",
+            "properties": {
+              "value": {
+                "description": "测试值",
+                "type": "number"
+              },
+              "grade": {
+                "description": "评估等级@1偏低（<1.0）@2正常（[1.0,9.0]）:@3:偏高([9.0,14.0])@4:过高(>14.0)",
+                "type": "integer"
+              },
+              "prv": {
+                "title": "personal_reference_value-个人参考值",
+                "type": "array",
+                "items": {
+                  "description": "区间",
+                  "type": "number"
+                }
+              }
+            },
+            "type": "object",
+            "example": "{value:3.0,grade:2,prv:[1.0,9.0]}"
+          },
+          "strong_index": {
+            "title": "健壮指数(评估等级商家自己定义)",
+            "properties": {
+              "value": {
+                "description": "测试值",
+                "type": "number"
+              },
+              "prv": {
+                "title": "personal_reference_value-个人参考值",
+                "type": "array",
+                "items": {
+                  "description": "区间",
+                  "type": "number"
+                }
+              },
+              "stars": {
+                "description": "星级",
+                "type": "number"
+              }
+            },
+            "type": "object",
+            "example": "{value:10.3,prv:[19.5,21.5],stars:0.5}"
+          },
+          "bmr": {
+            "title": "基础代谢-basal_metabolic_rate",
+            "properties": {
+              "value": {
+                "description": "测试值(kcal)",
+                "type": "number"
+              },
+              "grade": {
+                "description": "评估等级@1偏低:@2正常:@3:偏高",
+                "type": "integer"
+              },
+              "prv": {
+                "title": "personal_reference_value-个人参考值",
+                "type": "array",
+                "items": {
+                  "description": "区间",
+                  "type": "number"
+                }
+              }
+            },
+            "type": "object",
+            "example": "{value:1132,grade:1,prv:[1217,1334]}"
+          },
+          "tee": {
+            "title": "总能量消耗-total_energy_consumption",
+            "properties": {
+              "value": {
+                "description": "建议值(kcal)",
+                "type": "number"
+              }
+            },
+            "type": "object",
+            "example": "{value:1811}"
+          },
+          "bmi": {
+            "title": "身体质量指数-body_mass_index",
+            "properties": {
+              "value": {
+                "description": "测试值",
+                "type": "number"
+              },
+              "grade": {
+                "description": "评估等级@1偏低:@2正常:@3:偏高",
+                "type": "integer"
+              },
+              "prv": {
+                "title": "personal_reference_value-个人参考值",
+                "type": "array",
+                "items": {
+                  "description": "区间",
+                  "type": "number"
+                }
+              }
+            },
+            "type": "object",
+            "example": "{value:18.8,grade:2,prv:[18.5,24.0]}"
+          },
+          "ecw_stage": {
+            "title": "水分浮肿指数（仅SE设备有效）",
+            "properties": {
+              "v": {
+                "title": "总水分浮肿指数",
+                "properties": {
+                  "value": {
+                    "description": "测试值",
+                    "type": "number"
+                  },
+                  "grade": {
+                    "description": "评估等级@1偏低:@2正常:@3:标准@4正常:@5:偏高",
+                    "type": "integer"
+                  },
+                  "prv": {
+                    "title": "personal_reference_value-个人参考值",
+                    "type": "array",
+                    "items": {
+                      "description": "区间",
+                      "type": "number"
+                    }
+                  }
+                },
+                "type": "object"
+              },
+              "ra": {
+                "title": "右臂-right_arm",
+                "properties": {
+                  "value": {
+                    "description": "测试值",
+                    "type": "number"
+                  },
+                  "grade": {
+                    "description": "评估等级@1偏低:@2正常:@3:偏高",
+                    "type": "integer"
+                  },
+                  "prv": {
+                    "title": "personal_reference_value-个人参考值",
+                    "type": "array",
+                    "items": {
+                      "description": "区间",
+                      "type": "number"
+                    }
+                  }
+                },
+                "type": "object"
+              },
+              "la": {
+                "title": "左臂-left_arm",
+                "properties": {
+                  "value": {
+                    "description": "测试值",
+                    "type": "number"
+                  },
+                  "grade": {
+                    "description": "评估等级@1偏低:@2正常:@3:偏高",
+                    "type": "integer"
+                  },
+                  "prv": {
+                    "title": "personal_reference_value-个人参考值",
+                    "type": "array",
+                    "items": {
+                      "description": "区间",
+                      "type": "number"
+                    }
+                  }
+                },
+                "type": "object"
+              },
+              "tr": {
+                "title": "躯干-trunk",
+                "properties": {
+                  "value": {
+                    "description": "测试值",
+                    "type": "number"
+                  },
+                  "grade": {
+                    "description": "评估等级@1偏低:@2正常:@3:偏高",
+                    "type": "integer"
+                  },
+                  "prv": {
+                    "title": "personal_reference_value-个人参考值",
+                    "type": "array",
+                    "items": {
+                      "description": "区间",
+                      "type": "number"
+                    }
+                  }
+                },
+                "type": "object"
+              },
+              "rl": {
+                "title": "右腿-right_leg",
+                "properties": {
+                  "value": {
+                    "description": "测试值",
+                    "type": "number"
+                  },
+                  "grade": {
+                    "description": "评估等级@1偏低:@2正常:@3:偏高",
+                    "type": "integer"
+                  },
+                  "prv": {
+                    "title": "personal_reference_value-个人参考值",
+                    "type": "array",
+                    "items": {
+                      "description": "区间",
+                      "type": "number"
+                    }
+                  }
+                },
+                "type": "object"
+              },
+              "ll": {
+                "title": "左腿-left_leg",
+                "properties": {
+                  "value": {
+                    "description": "测试值",
+                    "type": "number"
+                  },
+                  "grade": {
+                    "description": "评估等级@1偏低:@2正常:@3:偏高",
+                    "type": "integer"
+                  },
+                  "prv": {
+                    "title": "personal_reference_value-个人参考值",
+                    "type": "array",
+                    "items": {
+                      "description": "区间",
+                      "type": "number"
+                    }
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object",
+            "example": "{\"l1\":{\"value\":0.448,\"grade\":3,\"prv\":[0.33,0.43]},\"la\":{\"value\":0.418,\"grade\":2,\"prv\":[0.33,0.43]},\"r1\":{\"value\":0.444,\"grade\":3,\"prv\":[0.33,0.43]},\"ra\":{\"value\":0.415,\"grade\":2,\"prv\":[0.33,0.43]},\"tr\":{\"value\":0.87,\"grade\":3,\"prv\":[0.33,0.43]},\"v\":{\"value\":0.649,\"grade\":5,\"prv\":[0.33,0.36,0.4,0.43]}}"
+          },
+          "ecf_stage": {
+            "title": "液体浮肿指数（仅SE设备有效）",
+            "properties": {
+              "v": {
+                "title": "总液体浮肿指数",
+                "properties": {
+                  "value": {
+                    "description": "测试值",
+                    "type": "number"
+                  },
+                  "grade": {
+                    "description": "评估等级@1偏低:@2正常:@3:标准@4正常:@5:偏高",
+                    "type": "integer"
+                  },
+                  "prv": {
+                    "title": "personal_reference_value-个人参考值",
+                    "type": "array",
+                    "items": {
+                      "description": "区间",
+                      "type": "number"
+                    }
+                  }
+                },
+                "type": "object"
+              },
+              "ra": {
+                "title": "右臂-right_arm",
+                "properties": {
+                  "value": {
+                    "description": "测试值",
+                    "type": "number"
+                  },
+                  "grade": {
+                    "description": "评估等级@1偏低:@2正常:@3:偏高",
+                    "type": "integer"
+                  },
+                  "prv": {
+                    "title": "personal_reference_value-个人参考值",
+                    "type": "array",
+                    "items": {
+                      "description": "区间",
+                      "type": "number"
+                    }
+                  }
+                },
+                "type": "object"
+              },
+              "la": {
+                "title": "左臂-left_arm",
+                "properties": {
+                  "value": {
+                    "description": "测试值",
+                    "type": "number"
+                  },
+                  "grade": {
+                    "description": "评估等级@1偏低:@2正常:@3:偏高",
+                    "type": "integer"
+                  },
+                  "prv": {
+                    "title": "personal_reference_value-个人参考值",
+                    "type": "array",
+                    "items": {
+                      "description": "区间",
+                      "type": "number"
+                    }
+                  }
+                },
+                "type": "object"
+              },
+              "tr": {
+                "title": "躯干-trunk",
+                "properties": {
+                  "value": {
+                    "description": "测试值",
+                    "type": "number"
+                  },
+                  "grade": {
+                    "description": "评估等级@1偏低:@2正常:@3:偏高",
+                    "type": "integer"
+                  },
+                  "prv": {
+                    "title": "personal_reference_value-个人参考值",
+                    "type": "array",
+                    "items": {
+                      "description": "区间",
+                      "type": "number"
+                    }
+                  }
+                },
+                "type": "object"
+              },
+              "rl": {
+                "title": "右腿-right_leg",
+                "properties": {
+                  "value": {
+                    "description": "测试值",
+                    "type": "number"
+                  },
+                  "grade": {
+                    "description": "评估等级@1偏低:@2正常:@3:偏高",
+                    "type": "integer"
+                  },
+                  "prv": {
+                    "title": "personal_reference_value-个人参考值",
+                    "type": "array",
+                    "items": {
+                      "description": "区间",
+                      "type": "number"
+                    }
+                  }
+                },
+                "type": "object"
+              },
+              "ll": {
+                "title": "左腿-left_leg",
+                "properties": {
+                  "value": {
+                    "description": "测试值",
+                    "type": "number"
+                  },
+                  "grade": {
+                    "description": "评估等级@1偏低:@2正常:@3:偏高",
+                    "type": "integer"
+                  },
+                  "prv": {
+                    "title": "personal_reference_value-个人参考值",
+                    "type": "array",
+                    "items": {
+                      "description": "区间",
+                      "type": "number"
+                    }
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object",
+            "example": "{\"l1\":{\"value\":0.448,\"grade\":3,\"prv\":[0.33,0.43]},\"la\":{\"value\":0.418,\"grade\":2,\"prv\":[0.33,0.43]},\"r1\":{\"value\":0.444,\"grade\":3,\"prv\":[0.33,0.43]},\"ra\":{\"value\":0.415,\"grade\":2,\"prv\":[0.33,0.43]},\"tr\":{\"value\":0.87,\"grade\":3,\"prv\":[0.33,0.43]},\"v\":{\"value\":0.649,\"grade\":5,\"prv\":[0.33,0.36,0.4,0.43]}}"
+          },
+          "inside_water": {
+            "title": "细胞内水（仅SE设备有效）",
+            "properties": {
+              "value": {
+                "description": "测试值(kg)",
+                "type": "number"
+              },
+              "grade": {
+                "description": "评估等级@1不足:@2一般:@3:充足",
+                "type": "integer"
+              },
+              "prv": {
+                "title": "personal_reference_value-个人参考值",
+                "type": "array",
+                "items": {
+                  "description": "区间",
+                  "type": "number"
+                }
+              }
+            },
+            "type": "object",
+            "example": "{value:10.7,grade:1,prv:[24.5,30.7]}"
+          },
+          "outside_water": {
+            "title": "细胞外水（仅SE设备有效）",
+            "properties": {
+              "value": {
+                "description": "测试值(kg)",
+                "type": "number"
+              },
+              "grade": {
+                "description": "评估等级@1不足:@2一般:@3:充足",
+                "type": "integer"
+              },
+              "prv": {
+                "title": "personal_reference_value-个人参考值",
+                "type": "array",
+                "items": {
+                  "description": "区间",
+                  "type": "number"
+                }
+              }
+            },
+            "type": "object",
+            "example": "{value:28.7,grade:2,prv:[24.5,30.7]}"
+          },
+          "body_age_offset": {
+            "title": "身体年龄偏移量-body_age_offset",
+            "properties": {
+              "value": {
+                "description": "偏移值(岁)",
+                "type": "number"
+              }
+            },
+            "type": "object",
+            "example": "{value:0.0}"
+          },
+          "figure": {
+            "title": "体型评估",
+            "properties": {
+              "value": {
+                "description": "评估等级@1:健壮@2:强壮@3:壮硕@4:肥硕@5:矫健@6:匀称@7:肥胖@8:严重肥胖@9:消瘦@10:虚弱@11:虚胖@12:严重虚胖",
+                "type": "integer"
+              },
+              "map": {
+                "title": "体形图坐标",
+                "description": "体形图：绘制详情请见<a href='/open/api/img/figure_map2.png'>/open/api/img/figure_map.jpg</a>",
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              }
+            },
+            "type": "object",
+            "example": "{grade:10,map:[12,14.5,18,20.5,10,20,30,42,52,14.2,23.4]}"
+          },
+          "evaluation": {
+            "title": "风险评估",
+            "properties": {
+              "fat": {
+                "title": "肥胖评估",
+                "properties": {
+                  "grade": {
+                    "description": "评估等级[仅成人]：1（瘦）->4（胖）",
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "abdominal_fat": {
+                "title": "腹部肥胖",
+                "properties": {
+                  "grade": {
+                    "description": "评估等级[仅成人]：1（瘦）->4（胖）",
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "weakness": {
+                "title": "虚弱评估",
+                "properties": {
+                  "grade": {
+                    "description": "评估等级[仅成人]：1（壮）->4（虚）",
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "nutrition": {
+                "title": "营养评估",
+                "properties": {
+                  "grade": {
+                    "description": "评估等级[仅成人]：1（足）->4（缺）",
+                    "type": "integer"
+                  },
+                  "value": {
+                    "description": "百分制[仅儿童]",
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "calcium": {
+                "title": "钙质得分",
+                "properties": {
+                  "value": {
+                    "description": "百分制[仅儿童]",
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "bfm": {
+                "title": "脂肪得分",
+                "properties": {
+                  "value": {
+                    "description": "百分制[仅儿童]",
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "figure": {
+                "title": "体型评估",
+                "properties": {
+                  "value": {
+                    "description": "百分制[仅儿童]",
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "muscle": {
+                "title": "肌肉得分",
+                "properties": {
+                  "value": {
+                    "description": "百分制[仅儿童]",
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "protein": {
+                "title": "蛋白质评估",
+                "properties": {
+                  "value": {
+                    "description": "百分制[仅儿童]",
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "bmr": {
+                "title": "代谢消耗",
+                "properties": {
+                  "value": {
+                    "description": "百分制[仅儿童]",
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "growth": {
+                "title": "生长发育",
+                "description": "备注：1.2.9.1201-beta04 版本后新增",
+                "properties": {
+                  "value": {
+                    "description": "百分制[仅儿童]",
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object",
+            "example": "fat:{grade:3},abdominal_fat:{grade:2},weakness:{grade:4},nutrition:{grade:3},"
+          },
+          "score": {
+            "title": "综合评估（仅限儿童版）",
+            "properties": {
+              "grade": {
+                "description": "得分",
+                "type": "integer"
+              }
+            },
+            "type": "object",
+            "example": "{grade:4}"
+          },
+          "body_score": {
+            "title": "身体评估总分",
+            "properties": {
+              "value": {
+                "description": "分数",
+                "type": "number"
+              }
+            },
+            "type": "object",
+            "example": "{value:75.00}"
+          },
+          "calcium": {
+            "title": "钙质（仅限儿童版）",
+            "properties": {
+              "value": {
+                "description": "测试值(kg)",
+                "type": "number"
+              },
+              "grade": {
+                "description": "评估等级@1不足:@2一般:@3:充足",
+                "type": "integer"
+              },
+              "prv": {
+                "title": "personal_reference_value-个人参考值",
+                "type": "array",
+                "items": {
+                  "description": "区间",
+                  "type": "number"
+                }
+              }
+            },
+            "type": "object",
+            "example": "{value:10.7,grade:1,prv:[24.5,30.7]}"
+          },
+          "muscle_control": {
+            "title": "肌肉调节量",
+            "properties": {
+              "value": {
+                "description": "调节量(kg)【注：只增不减】",
+                "type": "number"
+              },
+              "water_drop": {
+                "description": "水滴数 @0:很棒@1:请继续保持@2:不错哦@3:加油@4:努力@5你危险了",
+                "type": "number"
+              }
+            },
+            "type": "object",
+            "example": "{value:30.4,water_drop:4}"
+          },
+          "fat_control": {
+            "title": "体脂肪调节量",
+            "properties": {
+              "value": {
+                "description": "调节量(kg)【注：只减不增，返回数据为正，但是默认为负】",
+                "type": "number"
+              },
+              "water_drop": {
+                "description": "水滴数 @0:很棒@1:请继续保持@2:不错哦@3:加油@4:努力@5你危险了",
+                "type": "number"
+              }
+            },
+            "type": "object",
+            "example": "{value:-2.3}"
+          },
+          "segmental_smm_control": {
+            "title": "节段肌肉调节量（仅U+设备有效）",
+            "properties": {
+              "ra": {
+                "title": "右臂-right_arm",
+                "properties": {
+                  "value": {
+                    "description": "测试值(kg)",
+                    "type": "number"
+                  }
+                },
+                "type": "object"
+              },
+              "la": {
+                "title": "左臂-left_arm",
+                "properties": {
+                  "value": {
+                    "description": "测试值(kg)",
+                    "type": "number"
+                  }
+                },
+                "type": "object"
+              },
+              "tr": {
+                "title": "躯干-trunk",
+                "properties": {
+                  "value": {
+                    "description": "测试值(kg)",
+                    "type": "number"
+                  }
+                },
+                "type": "object"
+              },
+              "rl": {
+                "title": "右腿-right_leg",
+                "properties": {
+                  "value": {
+                    "description": "测试值(kg)",
+                    "type": "number"
+                  }
+                },
+                "type": "object"
+              },
+              "ll": {
+                "title": "左腿-left_leg",
+                "properties": {
+                  "value": {
+                    "description": "测试值(kg)",
+                    "type": "number"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object",
+            "example": {
+              "la": {
+                "value": 0.3
+              },
+              "ll": {
+                "value": 2.7
+              },
+              "ra": {
+                "value": 0.2
+              },
+              "rl": {
+                "value": 2.45
+              },
+              "tr": {
+                "value": 6.75
+              }
+            }
+          },
+          "ideal": {
+            "title": "理想值（仅U+设备有效）",
+            "properties": {
+              "fat": {
+                "title": "脂肪量",
+                "properties": {
+                  "value": {
+                    "description": "测试值(kg)",
+                    "type": "number"
+                  }
+                },
+                "type": "object"
+              },
+              "bmr": {
+                "title": "基础代谢-basal_metabolic_rate",
+                "properties": {
+                  "value": {
+                    "description": "测试值(kg)",
+                    "type": "number"
+                  }
+                },
+                "type": "object"
+              },
+              "tee": {
+                "title": "总能量消耗-total_energy_consumption",
+                "properties": {
+                  "value": {
+                    "description": "测试值(kg)",
+                    "type": "number"
+                  }
+                },
+                "type": "object"
+              },
+              "muscle": {
+                "title": "肌肉量",
+                "properties": {
+                  "value": {
+                    "description": "测试值(kg)",
+                    "type": "number"
+                  }
+                },
+                "type": "object"
+              },
+              "smm": {
+                "title": "骨骼肌-skeletal_muscle_mass",
+                "properties": {
+                  "value": {
+                    "description": "测试值(kg)",
+                    "type": "number"
+                  }
+                },
+                "type": "object"
+              },
+              "vfi": {
+                "title": "内脏脂肪指数-visceral_fat_index",
+                "properties": {
+                  "value": {
+                    "description": "测试值",
+                    "type": "number"
+                  }
+                },
+                "type": "object"
+              },
+              "strong_index": {
+                "title": "健壮指数",
+                "properties": {
+                  "value": {
+                    "description": "测试值",
+                    "type": "number"
+                  }
+                },
+                "type": "object"
+              },
+              "pbf": {
+                "title": "体脂率-percent_body_fat",
+                "properties": {
+                  "value": {
+                    "description": "测试值(kg)",
+                    "type": "number"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object",
+            "example": {
+              "bmr": {
+                "value": 1416.3
+              },
+              "muscle": {
+                "value": 45.54
+              },
+              "smm": {
+                "value": 29.8
+              },
+              "vfi": {
+                "value": 5
+              },
+              "strong_index": {
+                "value": 16
+              },
+              "pbf": {
+                "value": 25
+              },
+              "tee": {
+                "value": 2266.1
+              },
+              "fat": {
+                "value": 16.15
+              }
+            }
+          }
+        },
+        "type": "object"
+      },
+      "GirthTransformer": {
+        "title": "girth - 形美围度[报告数据]",
+        "properties": {
+          "body_type": {
+            "description": "身材类型<br/>男性@100:匀称型身材@101:倒梯形型身材@102:倒三角身材@103:矩形身材@104:椭圆形身材@105:三角形身材<br/>女性@0:匀称型身材@1:沙漏型身材@2:草莓型身材@3:香蕉型身材@4:苹果型身材@5:梨子型身材",
+            "type": "number"
+          },
+          "head_height": {
+            "description": "头全高(cm)",
+            "type": "number"
+          },
+          "shoulder": {
+            "description": "肩宽(cm)",
+            "type": "number"
+          },
+          "height": {
+            "description": "身高(cm)",
+            "type": "number"
+          },
+          "leg_height": {
+            "description": "腿长(cm)",
+            "type": "number"
+          },
+          "chest": {
+            "description": "胸围(cm)",
+            "type": "number"
+          },
+          "waist": {
+            "description": "腰围(cm)",
+            "type": "number"
+          },
+          "hip": {
+            "description": "臀围(cm)<br/> 亚洲男性理想腰臀比0.85～0.95 <br/> 亚洲女性理想腰臀比0.67～0.80  <br/>",
+            "type": "number"
+          },
+          "lt": {
+            "description": "左大腿围(cm)",
+            "type": "number"
+          },
+          "rt": {
+            "description": "右大腿围(cm)",
+            "type": "number"
+          },
+          "prv": {
+            "title": "个人建议/标准参考值",
+            "type": "object",
+            "properties": {
+              "chest": {
+                "description": "胸围(cm)",
+                "type": "number"
+              },
+              "hip": {
+                "description": "臀围(cm)",
+                "type": "number"
+              },
+              "shoulder": {
+                "description": "肩宽(cm)",
+                "type": "number"
+              },
+              "thigh": {
+                "description": "腿长(cm)",
+                "type": "number"
+              },
+              "waist": {
+                "description": "腰围(cm)",
+                "type": "number"
+              }
+            }
+          },
+          "hbr": {
+            "description": "头身比<br/> 亚洲男性平均为7.18头身，亚洲女性平均为6.95头身<br/> 欧美男性平均为7.57头身，欧美女性平均为7.49头身<br/> 头身比=身高/头全高",
+            "type": "number"
+          },
+          "shr": {
+            "description": "肩臀比<br/> 亚洲男性理想肩臀比0.85～0.95<br/> 肩臀比=肩宽/臀围",
+            "type": "number"
+          },
+          "lbr": {
+            "description": "腿身比<br/> 亚洲男性平均为45.70，亚洲女性平均为44.90<br/> 欧美男性平均为47.68，欧美女性平均为47.34<br/> 腿身比=腿长/身高 * 100",
+            "type": "number"
+          },
+          "whr": {
+            "description": "腰臀比<br/> 亚洲女性理想腰臀比0.67～0.80<br/> 腰臀比=腰围/臀围",
+            "type": "number"
+          },
+          "skeleton_point_image_uris": {
+            "title": "标注图",
+            "type": "object",
+            "properties": {
+              "circumference_differ": {
+                "description": "围度差（女性：胸腰差、臀腰差；男性：肩腰差、臀腰差）",
+                "type": "string"
+              },
+              "head_to_body_ratio": {
+                "description": "头身比",
+                "type": "string"
+              },
+              "circumference_ratio": {
+                "description": "维度比（女性：腰臀比；男性：肩臀比）",
+                "type": "string"
+              },
+              "leg_to_body_ratio": {
+                "description": "腿身比",
+                "type": "string"
+              }
+            }
+          },
+          "source_image": {
+            "title": "原始图",
+            "type": "object",
+            "properties": {
+              "front": {
+                "description": "正面",
+                "type": "string"
+              },
+              "left": {
+                "description": "左面",
+                "type": "string"
+              },
+              "right": {
+                "description": "右面",
+                "type": "string"
+              }
+            }
+          }
+        },
+        "type": "object"
+      },
+      "PostureTransformer": {
+        "title": "posture - 姿态筛查[报告数据]",
+        "properties": {
+          "score": {
+            "title": "得分",
+            "example": 60,
+            "type": "number"
+          },
+          "evaluation": {
+            "title": "风险评估",
+            "properties": {
+              "posture": {
+                "title": "姿态筛查",
+                "properties": {
+                  "value": {
+                    "description": "百分制[仅儿童]",
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          },
+          "uneven_shoulders": {
+            "title": "高低肩（成人+儿童）",
+            "properties": {
+              "name": {
+                "description": "名称",
+                "type": "string"
+              },
+              "interval": {
+                "description": "得分间隔（数组）",
+                "example": "[0,5,15,30]",
+                "type": "string"
+              },
+              "grades": {
+                "description": "等级类别（数组）",
+                "example": "[\"正常\",\"轻微\",\"中度\",\"重度\"]",
+                "type": "string"
+              },
+              "unit": {
+                "description": "单位",
+                "example": "",
+                "type": "string"
+              },
+              "grade": {
+                "description": "等级",
+                "example": "",
+                "type": "string"
+              },
+              "describe": {
+                "properties": {
+                  "name": {
+                    "description": "症状",
+                    "type": "string"
+                  },
+                  "causes": {
+                    "description": "引起的原因",
+                    "type": "string"
+                  },
+                  "risks": {
+                    "description": "导致哪些不适",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "mark_figure": {
+                "description": "标注图URL",
+                "type": "string"
+              },
+              "mark_figure_focus": {
+                "description": "标注图聚焦图URL",
+                "type": "string"
+              }
+            }
+          },
+          "leg_type": {
+            "title": "0/X型腿（成人+儿童）",
+            "properties": {
+              "name": {
+                "description": "名称",
+                "type": "string"
+              },
+              "interval": {
+                "description": "得分间隔（数组）",
+                "example": "[0,5,15,30]",
+                "type": "string"
+              },
+              "grades": {
+                "description": "等级类别（数组）",
+                "example": "[\"正常\",\"轻微\",\"中度\",\"重度\"]",
+                "type": "string"
+              },
+              "unit": {
+                "description": "单位",
+                "example": "",
+                "type": "string"
+              },
+              "grade": {
+                "description": "等级",
+                "example": "",
+                "type": "string"
+              },
+              "describe": {
+                "properties": {
+                  "name": {
+                    "description": "症状",
+                    "type": "string"
+                  },
+                  "causes": {
+                    "description": "引起的原因",
+                    "type": "string"
+                  },
+                  "risks": {
+                    "description": "导致哪些不适",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "mark_figure": {
+                "description": "标注图URL",
+                "type": "string"
+              },
+              "mark_figure_focus": {
+                "description": "标注图聚焦图URL",
+                "type": "string"
+              }
+            }
+          },
+          "neck_forward": {
+            "title": "颈椎前沿（成人+儿童）",
+            "properties": {
+              "name": {
+                "description": "名称",
+                "type": "string"
+              },
+              "interval": {
+                "description": "得分间隔（数组）",
+                "example": "[0,5,15,30]",
+                "type": "string"
+              },
+              "grades": {
+                "description": "等级类别（数组）",
+                "example": "[\"正常\",\"轻微\",\"中度\",\"重度\"]",
+                "type": "string"
+              },
+              "unit": {
+                "description": "单位",
+                "example": "",
+                "type": "string"
+              },
+              "grade": {
+                "description": "等级",
+                "example": "",
+                "type": "string"
+              },
+              "describe": {
+                "properties": {
+                  "name": {
+                    "description": "症状",
+                    "type": "string"
+                  },
+                  "causes": {
+                    "description": "引起的原因",
+                    "type": "string"
+                  },
+                  "risks": {
+                    "description": "导致哪些不适",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "mark_figure": {
+                "description": "标注图URL",
+                "type": "string"
+              },
+              "mark_figure_focus": {
+                "description": "标注图聚焦图URL",
+                "type": "string"
+              }
+            }
+          },
+          "round_shouldered_hunchback": {
+            "title": "圆肩驼背（成人+儿童）",
+            "properties": {
+              "name": {
+                "description": "名称",
+                "type": "string"
+              },
+              "interval": {
+                "description": "得分间隔（数组）",
+                "example": "[0,5,15,30]",
+                "type": "string"
+              },
+              "grades": {
+                "description": "等级类别（数组）",
+                "example": "[\"正常\",\"轻微\",\"中度\",\"重度\"]",
+                "type": "string"
+              },
+              "unit": {
+                "description": "单位",
+                "example": "",
+                "type": "string"
+              },
+              "grade": {
+                "description": "等级",
+                "example": "",
+                "type": "string"
+              },
+              "describe": {
+                "properties": {
+                  "name": {
+                    "description": "名称",
+                    "type": "string"
+                  },
+                  "causes": {
+                    "description": "引起的原因",
+                    "type": "string"
+                  },
+                  "risks": {
+                    "description": "后果",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "mark_figure": {
+                "description": "标注图URL",
+                "type": "string"
+              },
+              "mark_figure_focus": {
+                "description": "标注图聚焦图URL",
+                "type": "string"
+              }
+            }
+          },
+          "pelvic_obliquity": {
+            "title": "骨盆倾斜（成人）",
+            "properties": {
+              "name": {
+                "description": "名称",
+                "type": "string"
+              },
+              "interval": {
+                "description": "得分间隔（数组）",
+                "example": "[0,5,15,30]",
+                "type": "string"
+              },
+              "grades": {
+                "description": "等级类别（数组）",
+                "example": "[\"正常\",\"轻微\",\"中度\",\"重度\"]",
+                "type": "string"
+              },
+              "unit": {
+                "description": "单位",
+                "example": "",
+                "type": "string"
+              },
+              "grade": {
+                "description": "等级",
+                "example": "",
+                "type": "string"
+              },
+              "describe": {
+                "properties": {
+                  "name": {
+                    "description": "症状",
+                    "type": "string"
+                  },
+                  "causes": {
+                    "description": "引起的原因",
+                    "type": "string"
+                  },
+                  "risks": {
+                    "description": "导致哪些不适",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "mark_figure": {
+                "description": "标注图URL",
+                "type": "string"
+              },
+              "mark_figure_focus": {
+                "description": "标注图聚焦图URL",
+                "type": "string"
+              }
+            }
+          },
+          "pelvis_flank": {
+            "title": "盆骨侧倾（成人）",
+            "properties": {
+              "name": {
+                "description": "名称",
+                "type": "string"
+              },
+              "interval": {
+                "description": "得分间隔（数组）",
+                "example": "[0,5,15,30]",
+                "type": "string"
+              },
+              "grades": {
+                "description": "等级类别（数组）",
+                "example": "[\"正常\",\"轻微\",\"中度\",\"重度\"]",
+                "type": "string"
+              },
+              "unit": {
+                "description": "单位",
+                "example": "",
+                "type": "string"
+              },
+              "grade": {
+                "description": "等级",
+                "example": "",
+                "type": "string"
+              },
+              "describe": {
+                "properties": {
+                  "name": {
+                    "description": "症状",
+                    "type": "string"
+                  },
+                  "causes": {
+                    "description": "引起的原因",
+                    "type": "string"
+                  },
+                  "risks": {
+                    "description": "导致哪些不适",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "mark_figure": {
+                "description": "标注图URL",
+                "type": "string"
+              },
+              "mark_figure_focus": {
+                "description": "标注图聚焦图URL",
+                "type": "string"
+              }
+            }
+          },
+          "knee_overextension": {
+            "title": "膝超伸（成人）",
+            "properties": {
+              "name": {
+                "description": "名称",
+                "type": "string"
+              },
+              "interval": {
+                "description": "得分间隔（数组）",
+                "example": "[0,5,15,30]",
+                "type": "string"
+              },
+              "grades": {
+                "description": "等级类别（数组）",
+                "example": "[\"正常\",\"轻微\",\"中度\",\"重度\"]",
+                "type": "string"
+              },
+              "unit": {
+                "description": "单位",
+                "example": "",
+                "type": "string"
+              },
+              "grade": {
+                "description": "等级",
+                "example": "",
+                "type": "string"
+              },
+              "describe": {
+                "properties": {
+                  "name": {
+                    "description": "症状",
+                    "type": "string"
+                  },
+                  "causes": {
+                    "description": "引起的原因",
+                    "type": "string"
+                  },
+                  "risks": {
+                    "description": "导致哪些不适",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "mark_figure": {
+                "description": "标注图URL",
+                "type": "string"
+              },
+              "mark_figure_focus": {
+                "description": "标注图聚焦图URL",
+                "type": "string"
+              }
+            }
+          },
+          "cervical_scoliosis": {
+            "title": "颈椎侧弯（成人+儿童）",
+            "properties": {
+              "name": {
+                "description": "名称",
+                "type": "string"
+              },
+              "interval": {
+                "description": "得分间隔（数组）",
+                "example": "[0,5,15,30]",
+                "type": "string"
+              },
+              "grades": {
+                "description": "等级类别（数组）",
+                "example": "[\"正常\",\"轻微\",\"中度\",\"重度\"]",
+                "type": "string"
+              },
+              "unit": {
+                "description": "单位",
+                "example": "",
+                "type": "string"
+              },
+              "grade": {
+                "description": "等级",
+                "example": "",
+                "type": "string"
+              },
+              "describe": {
+                "properties": {
+                  "name": {
+                    "description": "症状",
+                    "type": "string"
+                  },
+                  "causes": {
+                    "description": "引起的原因",
+                    "type": "string"
+                  },
+                  "risks": {
+                    "description": "导致哪些不适",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "mark_figure": {
+                "description": "标注图URL",
+                "type": "string"
+              },
+              "mark_figure_focus": {
+                "description": "标注图聚焦图URL",
+                "type": "string"
+              }
+            }
+          },
+          "scoliosis": {
+            "title": "脊柱侧弯（成人+儿童）",
+            "properties": {
+              "name": {
+                "description": "名称",
+                "type": "string"
+              },
+              "interval": {
+                "description": "得分间隔（数组）",
+                "example": "[0,5,15,30]",
+                "type": "string"
+              },
+              "grades": {
+                "description": "等级类别（数组）",
+                "example": "[\"正常\",\"轻微\",\"中度\",\"重度\"]",
+                "type": "string"
+              },
+              "unit": {
+                "description": "单位",
+                "example": "",
+                "type": "string"
+              },
+              "grade": {
+                "description": "等级",
+                "example": "",
+                "type": "string"
+              },
+              "describe": {
+                "properties": {
+                  "name": {
+                    "description": "症状",
+                    "type": "string"
+                  },
+                  "causes": {
+                    "description": "引起的原因",
+                    "type": "string"
+                  },
+                  "risks": {
+                    "description": "导致哪些不适",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "mark_figure": {
+                "description": "标注图URL",
+                "type": "string"
+              },
+              "mark_figure_focus": {
+                "description": "标注图聚焦图URL",
+                "type": "string"
+              }
+            }
+          },
+          "source_image": {
+            "title": "原始图",
+            "type": "object",
+            "properties": {
+              "front": {
+                "description": "正面",
+                "type": "string"
+              },
+              "left": {
+                "description": "左面",
+                "type": "string"
+              },
+              "back": {
+                "description": "背面",
+                "type": "string"
+              }
+            }
+          },
+          "spine_image": {
+            "title": "脊柱图",
+            "description": "仅 pro/se 1.2.8.1124 及以后版本报告包含",
+            "type": "object",
+            "properties": {
+              "left": {
+                "description": "左面",
+                "type": "string"
+              },
+              "back": {
+                "description": "背面",
+                "type": "string"
+              }
+            }
+          }
+        },
+        "type": "object"
+      },
+      "PostpartumTransformer": {
+        "title": "postpartum - 产后评估[报告数据]（仅U+设备有效）",
+        "properties": {
+          "rac_up": {
+            "description": "腹直肌上部间隙 @0两指之内,@1两指以上",
+            "type": "number",
+            "example": 1
+          },
+          "rac_centre": {
+            "description": "腹直肌中央间隙 @0两指之内,@1两指以上",
+            "type": "number",
+            "example": 1
+          },
+          "rac_down": {
+            "description": "腹直肌下部间隙 @0两指之内,@1两指以上",
+            "type": "number",
+            "example": 1
+          },
+          "pk_left": {
+            "description": "按压左膝盖内侧 @0无疼痛,@1有疼痛",
+            "type": "number",
+            "example": 1
+          },
+          "pk_right": {
+            "description": "按压右膝盖内侧 @0无疼痛,@1有疼痛",
+            "type": "number",
+            "example": 1
+          },
+          "rac_type": {
+            "description": "腹直肌分离类型 @0:正常,@1:开放性分离,@2:脐下分离,@3:脐上分离,@4:完全开放性分离",
+            "type": "number",
+            "example": 1
+          },
+          "pk_type": {
+            "description": "耻骨联合分离 @0:正常,@1:耻骨联合分离",
+            "type": "number",
+            "example": 1
+          },
+          "score": {
+            "description": "产后评估得分",
+            "type": "number",
+            "example": 1
+          }
+        },
+        "type": "object"
+      },
+      "BalanceTransformer": {
+        "title": "balance - 平衡性[报告数据]",
+        "properties": {
+          "stability": {
+            "description": "稳定性数组<br>构成说明：[ 时间点（毫秒），核心机得分，膝关节得分 ]",
+            "type": "string",
+            "example": "[[1,91,85],[2,98,75],[3,41,105]]"
+          },
+          "stability_stage": {
+            "description": "稳定性阶段数组（单位：毫秒）<br>构成说明：[ 阶段类型（0稳定阶段，1维稳阶段，2失衡阶段）,开始时间（毫秒），截止时间（毫秒） ]",
+            "type": "string",
+            "example": "[[0,0,6000],[1,6000,14000],[2,14000,17000]]"
+          },
+          "action_standard": {
+            "description": "动作标准性得分（满分50分）",
+            "type": "number",
+            "example": 18
+          },
+          "predeter_time": {
+            "description": "测试预定时长（秒）",
+            "type": "number",
+            "example": 25
+          },
+          "end_reason_time": {
+            "description": "结束时间（毫秒）",
+            "type": "number",
+            "example": 1700
+          },
+          "end_reason_type": {
+            "description": "结束原因类型:<br>@-1:未知原因<br>@0:完成完整测试<br>@1:眼睛睁开<br>@2:身体倾倒<br>@3:支撑脚移动<br>@4:动作无效<br>@5:手偏移<br>@6:腿部动作不规范<br>@7:手部动作不规范",
+            "type": "number",
+            "example": 1
+          },
+          "total_score": {
+            "description": "综合评分<br> [170~200]分:优秀<br> [140~169]分:良好<br> [110~139]分:一般<br> [0~109]分:待加强<br> 计算方式：综合评分 = 动作标准性得分 + 核心稳定性得分 + 下肢稳定性得分 + 坚持时长（秒）*2",
+            "type": "number",
+            "example": 76
+          },
+          "core_stability": {
+            "description": "核心稳定性得分<br>[0,26)分:你的核心稳定性有待加强，建议在日常训练中加强腰部、腹部和脊柱的伸展及训练。<br>[26,41)分:你的核心稳定性有待加强，建议在日常训练中加强腰部、腹部和脊柱的伸展及训练。<br>[41,50]分:你的核心稳定性较好，建议在日常训练中保持腰部、腹部和脊柱的伸展及训练。",
+            "type": "number",
+            "example": 34
+          },
+          "lower_limb_stability": {
+            "description": "下肢稳定性得分<br>[0,26)分:你的膝关节无法在抬起一定高度时保持稳定，建议加强臀部外侧肌肉、下肢及脚踝周围的肌腱和韧带的力量，在训练中试着放松站立腿的膝盖，让站立腿的四头肌发力，以便配合臀部外侧肌肉帮助你保持平衡。<br/>[26,41)分:你的膝关节不能完全在抬起一定高度时保持稳定，建议加强臀部外侧肌肉、下肢及脚踝周围的肌腱和韧带的力量，在训练中试着放松站立腿的膝盖，让站立腿的四头肌发力，以便配合臀部外侧肌肉帮助你保持平衡。<br>[41,50]分:你的膝关节能够在抬起一定高度时保持稳定，建议保持训练臀部外侧肌肉、下肢及脚踝周围的肌腱和韧带的力量，以进一步提升稳定性",
+            "type": "number",
+            "example": 42
+          },
+          "swag_amplitude_picture": {
+            "description": "晃动幅度图片 url （有效期 24h）",
+            "type": "string",
+            "format": "uri"
+          },
+          "balance_stage_percentage": {
+            "description": "阶段百分比:稳定阶段",
+            "type": "string",
+            "example": "53.00"
+          },
+          "fluctuation_stage_percentage": {
+            "description": "阶段百分比:维稳阶段",
+            "type": "string",
+            "example": "12.00"
+          },
+          "imbalance_stage_percentage": {
+            "description": "阶段百分比:失衡阶段",
+            "type": "string",
+            "example": "35.00"
+          },
+          "source_image": {
+            "title": "原始图（早期版本不含此阶段图）",
+            "type": "object",
+            "properties": {
+              "balance_picture": {
+                "description": "稳定阶段（有效期 24h）",
+                "type": "string"
+              },
+              "fluctuation_picture": {
+                "description": "维稳阶段（有效期 24h）",
+                "type": "string"
+              },
+              "imbalance_picture": {
+                "description": "失衡阶段（有效期 24h）",
+                "type": "string"
+              }
+            }
+          }
+        },
+        "type": "object"
+      }
+    },
+    "responses": {
+      "200": {
+        "description": "successful operation",
+        "content": {
+          "application\\json": {
+            "schema": {
+              "properties": {
+                "access_token": {
+                  "type": "string"
+                },
+                "token_type": {
+                  "type": "string",
+                  "example": "bearer"
+                },
+                "expires_in": {
+                  "type": "integer"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      },
+      "400": {
+        "description": "Invalid ID supplier"
+      },
+      "404": {
+        "description": "Pet not found"
+      }
+    },
+    "parameters": {
+      "memberId": {
+        "name": "memberId",
+        "in": "path",
+        "description": "ID of member",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "page": {
+        "name": "page",
+        "in": "query",
+        "description": "页码",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      "phone": {
+        "name": "phone",
+        "in": "query",
+        "description": "输入的手机号",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "device_sn": {
+        "name": "device_sn",
+        "in": "query",
+        "description": "体测设备 SN",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "attachment_id": {
+        "name": "attachment_id",
+        "in": "query",
+        "description": "附件 ID",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "attachment_rom": {
+        "name": "attachment_rom",
+        "in": "query",
+        "description": "urlEncode后的附件扇区数据",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "measurementId": {
+        "name": "measurementId",
+        "in": "path",
+        "description": "ID of measurement",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "requestBodies": {
+      "auth": {
+        "description": "APP ID 和 APP SECRET",
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "app_id": {
+                  "type": "string"
+                },
+                "app_secret": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "bearerFormat": "JWT",
+        "scheme": "bearer"
+      }
+    }
+  }
+}

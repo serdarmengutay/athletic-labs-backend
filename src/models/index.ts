@@ -7,6 +7,7 @@ import AthleteTest from "./AthleteTest";
 import Measurement from "./Measurement";
 import HistoricalAthleteData from "./HistoricalAthleteData";
 import XOneReportImport from "./XOneReportImport";
+import YoujiuPushLog from "./YoujiuPushLog";
 
 // TODO MVP: Commented out models - re-enable after MVP
 /*
@@ -167,6 +168,7 @@ export {
   Measurement,
   HistoricalAthleteData,
   XOneReportImport,
+  YoujiuPushLog,
   // TODO MVP: Commented out exports
   // Club,
   // TestResult,

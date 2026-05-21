@@ -6,6 +6,7 @@ interface AthleteTestAttributes {
   id: string;
   test_session_id: string;
   athlete_id: string;
+  status: "active" | "absent" | "skipped";
   is_completed: boolean;
   completed_at: Date | null;
   created_at: Date;
@@ -15,7 +16,12 @@ interface AthleteTestAttributes {
 interface AthleteTestCreationAttributes
   extends Optional<
     AthleteTestAttributes,
-    "id" | "is_completed" | "completed_at" | "created_at" | "updated_at"
+    | "id"
+    | "status"
+    | "is_completed"
+    | "completed_at"
+    | "created_at"
+    | "updated_at"
   > {}
 
 class AthleteTest
@@ -25,6 +31,7 @@ class AthleteTest
   public id!: string;
   public test_session_id!: string;
   public athlete_id!: string;
+  public status!: "active" | "absent" | "skipped";
   public is_completed!: boolean;
   public completed_at!: Date | null;
   public readonly created_at!: Date;
@@ -53,6 +60,11 @@ AthleteTest.init(
         model: "athletes",
         key: "id",
       },
+    },
+    status: {
+      type: DataTypes.ENUM("active", "absent", "skipped"),
+      allowNull: false,
+      defaultValue: "active",
     },
     is_completed: {
       type: DataTypes.BOOLEAN,
