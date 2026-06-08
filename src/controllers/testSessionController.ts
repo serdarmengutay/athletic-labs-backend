@@ -647,50 +647,13 @@ export const importXOneQr = async (req: Request, res: Response) => {
         })
       : null;
 
-    if (existingImport) {
-      if (
+    if (
+      existingImport &&
+      !(
         existingImport.test_session_id === testSessionId &&
         existingImport.athlete_id === athleteId
-      ) {
-        const existingMeasurement = await Measurement.findOne({
-          where: { athlete_test_id: existingImport.athlete_test_id },
-        });
-        const normalized = normalizeXOnePayload(existingImport.raw_payload);
-
-        return res.status(200).json({
-          success: true,
-          message: "Youjiu QR raporu daha önce içe aktarılmış",
-          code: "X_ONE_IMPORT_ALREADY_EXISTS",
-          data: {
-            testSessionId,
-            athleteId,
-            athleteTestId: existingImport.athlete_test_id,
-            reportId: existingImport.report_id,
-            agentId: existingImport.agent_id,
-            hasQrToken: Boolean(existingImport.qr_token),
-            importId: existingImport.id,
-            measurementId: existingMeasurement?.id ?? null,
-            isComplete: false,
-            normalized: normalized.metrics,
-            sections: {
-              composition: Boolean(normalized.sections.composition),
-              measurement: Boolean(normalized.sections.measurement),
-              posture: Boolean(normalized.sections.posture),
-              balance: Boolean(normalized.sections.balance),
-            },
-            deviceData: {
-              rawPayload: existingImport.raw_payload,
-              result: existingImport.raw_payload?.result ?? null,
-              composition: normalized.sections.composition,
-              measurement: normalized.sections.measurement,
-              posture: normalized.sections.posture,
-              balance: normalized.sections.balance,
-            },
-            duplicate: true,
-          },
-        });
-      }
-
+      )
+    ) {
       return res.status(409).json({
         success: false,
         message: "Bu report_id daha önce içe aktarıldı",
@@ -702,15 +665,19 @@ export const importXOneQr = async (req: Request, res: Response) => {
         },
       });
     }
+    // TODO(production): Aynı oturum/sporcu için duplicate short-circuit'i tekrar aç.
+    // Şu an testte aynı QR tekrar okutulup resmi API mi H5 fallback mi geldiği görülebilsin diye
+    // aynı sporcuya ait eski kayıt varken de Youjiu yeniden sorgulanıyor.
 
     const client = new YoujiuApiClient();
-    const rawPayload = await client.getReportDetail({
+    const reportDetail = await client.getReportDetail({
       measurementId: parsedQr.measurementId,
       reportQuery: parsedQr.reportQuery,
       token: parsedQr.token,
       agentId: parsedQr.agentId,
       h5Report: parsedQr.h5Report,
     });
+    const rawPayload = reportDetail.payload;
 
     if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
       return res.status(502).json({
@@ -750,12 +717,11 @@ export const importXOneQr = async (req: Request, res: Response) => {
         const existingMeasurement = await Measurement.findOne({
           where: { athlete_test_id: duplicateAfterResolve.athlete_test_id },
         });
-        const existingNormalized = normalizeXOnePayload(duplicateAfterResolve.raw_payload);
 
         return res.status(200).json({
           success: true,
-          message: "Youjiu QR raporu daha önce içe aktarılmış",
-          code: "X_ONE_IMPORT_ALREADY_EXISTS",
+          message: "Youjiu QR raporu test için yeniden okundu",
+          code: "X_ONE_IMPORT_REFRESHED_FOR_TEST",
           data: {
             testSessionId,
             athleteId,
@@ -765,23 +731,31 @@ export const importXOneQr = async (req: Request, res: Response) => {
             hasQrToken: Boolean(duplicateAfterResolve.qr_token),
             importId: duplicateAfterResolve.id,
             measurementId: existingMeasurement?.id ?? null,
+            importSource: reportDetail.source,
+            importSourceLabel:
+              reportDetail.source === "official_api"
+                ? "Resmi Youjiu MCH V3 API"
+                : "Youjiu H5 rapor fallback",
+            officialMeasurementId: reportDetail.officialMeasurementId,
+            requestedMeasurementId: reportDetail.requestedMeasurementId,
             isComplete: false,
-            normalized: existingNormalized.metrics,
+            normalized: normalized.metrics,
             sections: {
-              composition: Boolean(existingNormalized.sections.composition),
-              measurement: Boolean(existingNormalized.sections.measurement),
-              posture: Boolean(existingNormalized.sections.posture),
-              balance: Boolean(existingNormalized.sections.balance),
+              composition: Boolean(normalized.sections.composition),
+              measurement: Boolean(normalized.sections.measurement),
+              posture: Boolean(normalized.sections.posture),
+              balance: Boolean(normalized.sections.balance),
             },
             deviceData: {
-              rawPayload: duplicateAfterResolve.raw_payload,
-              result: duplicateAfterResolve.raw_payload?.result ?? null,
-              composition: existingNormalized.sections.composition,
-              measurement: existingNormalized.sections.measurement,
-              posture: existingNormalized.sections.posture,
-              balance: existingNormalized.sections.balance,
+              rawPayload,
+              result: rawPayload?.result ?? null,
+              composition: normalized.sections.composition,
+              measurement: normalized.sections.measurement,
+              posture: normalized.sections.posture,
+              balance: normalized.sections.balance,
             },
             duplicate: true,
+            refreshedForTest: true,
           },
         });
       }
@@ -909,6 +883,13 @@ export const importXOneQr = async (req: Request, res: Response) => {
           hasQrToken: Boolean(parsedQr.token),
           importId: result.importedReport.id,
           measurementId: result.measurement?.id ?? null,
+          importSource: reportDetail.source,
+          importSourceLabel:
+            reportDetail.source === "official_api"
+              ? "Resmi Youjiu MCH V3 API"
+              : "Youjiu H5 rapor fallback",
+          officialMeasurementId: reportDetail.officialMeasurementId,
+          requestedMeasurementId: reportDetail.requestedMeasurementId,
           isComplete: result.isComplete,
           normalized: normalized.metrics,
           sections: {

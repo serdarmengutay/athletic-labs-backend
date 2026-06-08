@@ -23,6 +23,12 @@ import {
 
 const syncDatabase = async () => {
   try {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "sync-database uses sequelize.sync({ force: true }) and is blocked in production. Use npm run db:migrate instead.",
+      );
+    }
+
     console.log("🔄 Database bağlantısı test ediliyor...");
     await sequelize.authenticate();
     console.log("✅ Database bağlantısı başarılı!");

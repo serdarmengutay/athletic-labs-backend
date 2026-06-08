@@ -13,6 +13,16 @@ const sequelize = new Sequelize(
     }`,
   {
     dialect: "postgres",
+    dialectOptions:
+      process.env.DB_SSL === "true"
+        ? {
+            ssl: {
+              require: true,
+              rejectUnauthorized:
+                process.env.DB_SSL_REJECT_UNAUTHORIZED !== "false",
+            },
+          }
+        : undefined,
     logging: process.env.NODE_ENV === "development" ? console.log : false,
     pool: {
       max: 5,
@@ -29,4 +39,3 @@ const sequelize = new Sequelize(
 );
 
 export default sequelize;
-

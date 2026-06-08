@@ -32,6 +32,16 @@ interface YoujiuClientOptions {
   h5Report?: YoujiuH5ReportContext | null;
 }
 
+export type YoujiuReportSource = "official_api" | "h5_fallback";
+
+export interface YoujiuReportDetailResult {
+  payload: Record<string, any>;
+  source: YoujiuReportSource;
+  officialMeasurementId: string | null;
+  requestedMeasurementId: string;
+  usedH5Fallback: boolean;
+}
+
 const MEASUREMENT_ID_KEYS = [
   "measurementId",
   "measurement_id",
@@ -379,7 +389,7 @@ export class YoujiuApiClient {
     token,
     agentId,
     h5Report,
-  }: YoujiuClientOptions): Promise<Record<string, any>> {
+  }: YoujiuClientOptions): Promise<YoujiuReportDetailResult> {
     const accessToken = await this.getAccessToken();
     let resolvedMeasurementId = measurementId || null;
     let listPayload: Record<string, any> | null = null;
@@ -429,6 +439,7 @@ export class YoujiuApiClient {
     });
 
     let detailPayload: Record<string, any>;
+    let source: YoujiuReportSource = "official_api";
     try {
       detailPayload = await this.parseJsonResponse(response);
     } catch (error) {
@@ -439,6 +450,7 @@ export class YoujiuApiClient {
           agentId,
           h5Report: h5Report!,
         });
+        source = "h5_fallback";
       } else {
         throw error;
       }
@@ -448,10 +460,18 @@ export class YoujiuApiClient {
         measurementId: resolvedMeasurementId,
         usedReportQuery: reportQuery,
         hadListPayload: Boolean(listPayload),
-        usedH5Fallback: Boolean(detailPayload?.result),
+        source,
+        usedH5Fallback: source === "h5_fallback",
       });
     }
 
-    return detailPayload ?? listPayload ?? {};
+    return {
+      payload: detailPayload ?? listPayload ?? {},
+      source,
+      officialMeasurementId:
+        source === "official_api" ? resolvedMeasurementId : null,
+      requestedMeasurementId: resolvedMeasurementId,
+      usedH5Fallback: source === "h5_fallback",
+    };
   }
 }

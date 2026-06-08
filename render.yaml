@@ -1,0 +1,57 @@
+services:
+  - type: web
+    name: athletic-labs-api
+    runtime: node
+    region: frankfurt
+    plan: starter
+    buildCommand: npm ci && npm run build
+    preDeployCommand: npm run db:migrate
+    startCommand: npm run start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: athletic-labs-db
+          property: connectionString
+      - key: DB_SSL
+        value: "true"
+      - key: DB_SSL_REJECT_UNAUTHORIZED
+        value: "false"
+      - key: CORS_ORIGIN
+        value: https://panel.athleticlabs.com.tr
+      - key: JWT_SECRET
+        generateValue: true
+      - key: FIREBASE_PROJECT_ID
+        value: athletic-labs-97470
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
+      - key: YOUJIU_APP_ID
+        sync: false
+      - key: YOUJIU_APP_SECRET
+        sync: false
+      - key: YOUJIU_API_BASE_URL
+        value: https://open.youjiuhealth.com/mch/v3
+      - key: YOUJIU_ACCEPT_LANGUAGE
+        value: tr
+      - key: YOUJIU_ACCEPT_MEDIA_TYPE
+        value: application/vnd.XoneAPI.v3+json
+      - key: YOUJIU_DEFAULT_AGENT_ID
+        value: "3"
+      - key: YOUJIU_DEBUG
+        value: "false"
+      - key: YOUJIU_PUSH_INGEST_TOKEN
+        sync: false
+      - key: YOUJIU_PUSH_SECRET_KEY
+        sync: false
+
+databases:
+  - name: athletic-labs-db
+    region: frankfurt
+    plan: basic-256mb
+    databaseName: athletic_labs
+    user: athletic_labs

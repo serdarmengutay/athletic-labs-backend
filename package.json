@@ -9,6 +9,9 @@
     "build": "tsc",
     "migrate": "npx sequelize-cli db:migrate",
     "migrate:undo": "npx sequelize-cli db:migrate:undo",
+    "db:migrate": "npx sequelize-cli db:migrate",
+    "db:migrate:status": "npx sequelize-cli db:migrate:status",
+    "db:migrate:undo": "npx sequelize-cli db:migrate:undo",
     "seed": "npx sequelize-cli db:seed:all",
     "seed:undo": "npx sequelize-cli db:seed:undo:all",
     "sync-db": "npx ts-node src/scripts/sync-database.ts",
@@ -26,6 +29,9 @@
   ],
   "author": "",
   "license": "ISC",
+  "engines": {
+    "node": ">=20 <23"
+  },
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "compression": "^1.7.4",
