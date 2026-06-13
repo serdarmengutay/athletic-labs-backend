@@ -149,6 +149,11 @@ async function importWorkbookFile(
 ) {
   const workbook = XLSX.readFile(filePath, { cellDates: true });
   const clubName = extractClubNameFromFilePath(filePath, TEST_FOLDER);
+  const inferredGender = filePath
+    .toLocaleUpperCase("tr-TR")
+    .includes("VOLEYBOL")
+    ? ATHLETE_GENDERS.FEMALE
+    : ATHLETE_GENDERS.MALE;
   let importedAnySheet = false;
 
   for (const sheetName of workbook.SheetNames) {
@@ -206,7 +211,7 @@ async function importWorkbookFile(
           country_code: "TR",
           country_name: "Türkiye",
           birth_year: row.birthYear!,
-          gender: normalizeGender(row.gender),
+          gender: row.gender ? normalizeGender(row.gender) : inferredGender,
           height: row.height ?? null,
           weight: row.weight ?? null,
           bmi: row.bmi ?? null,
