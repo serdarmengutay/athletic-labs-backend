@@ -4,7 +4,7 @@
  */
 
 import { HistoricalAthleteData, Measurement } from "../models";
-import { classifyMaleFootballHandgrip } from "../config/handgripBenchmarks";
+import { classifyHandgrip } from "../config/handgripBenchmarks";
 import sequelize from "../config/database";
 import { Op, QueryTypes } from "sequelize";
 import {
@@ -1128,15 +1128,11 @@ export async function generateFrontendAthleteReport(
           ? Number(measurement.handgrip)
           : undefined,
       handgripCategory:
-        athleteGender === "male" &&
-        !athleteTest.testSession?.sport_type
-          ?.toLocaleLowerCase("tr")
-          .includes("voley")
-          ? classifyMaleFootballHandgrip(
-              athlete.birth_year,
-              measurement.handgrip,
-            ) ?? undefined
-          : undefined,
+        classifyHandgrip(
+          athlete.birth_year,
+          athleteGender,
+          measurement.handgrip,
+        ) ?? undefined,
     },
     ageGroupAverages,
     ageGroupPercentiles,
