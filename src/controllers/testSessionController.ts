@@ -1154,7 +1154,7 @@ export const importXOneQr = async (req: Request, res: Response) => {
 
       return res.status(409).json({
         success: false,
-        message: "Bu measurement id daha önce içe aktarıldı",
+        message: "Bu QR kodu başka bir sporcuya atanmış",
         code: "DUPLICATE_REPORT_ID",
         data: {
           reportId: duplicateAfterResolve.report_id,
@@ -1320,7 +1320,7 @@ export const importXOneQr = async (req: Request, res: Response) => {
       if (error instanceof UniqueConstraintError) {
         return res.status(409).json({
           success: false,
-          message: "Bu report_id daha önce içe aktarıldı",
+          message: "Bu QR kodu başka bir sporcuya atanmış",
           code: "DUPLICATE_REPORT_ID",
         });
       }
