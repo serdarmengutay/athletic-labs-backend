@@ -15,6 +15,11 @@ interface XOneReportImportAttributes {
   measurement: Record<string, any> | null;
   posture: Record<string, any> | null;
   balance: Record<string, any> | null;
+  measurement_time: Date | null;
+  body_fat_percent: number | null;
+  mineral_amount: number | null;
+  protein_amount: number | null;
+  device_serial: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -29,6 +34,11 @@ interface XOneReportImportCreationAttributes
     | "measurement"
     | "posture"
     | "balance"
+    | "measurement_time"
+    | "body_fat_percent"
+    | "mineral_amount"
+    | "protein_amount"
+    | "device_serial"
     | "created_at"
     | "updated_at"
   > {}
@@ -53,6 +63,11 @@ class XOneReportImport
   public measurement!: Record<string, any> | null;
   public posture!: Record<string, any> | null;
   public balance!: Record<string, any> | null;
+  public measurement_time!: Date | null;
+  public body_fat_percent!: number | null;
+  public mineral_amount!: number | null;
+  public protein_amount!: number | null;
+  public device_serial!: string | null;
   public readonly created_at!: Date;
   public readonly updated_at!: Date;
 }
@@ -123,6 +138,26 @@ XOneReportImport.init(
     },
     balance: {
       type: DataTypes.JSONB,
+      allowNull: true,
+    },
+    measurement_time: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    body_fat_percent: {
+      type: DataTypes.DECIMAL(5, 2),
+      allowNull: true,
+    },
+    mineral_amount: {
+      type: DataTypes.DECIMAL(7, 2),
+      allowNull: true,
+    },
+    protein_amount: {
+      type: DataTypes.DECIMAL(7, 2),
+      allowNull: true,
+    },
+    device_serial: {
+      type: DataTypes.STRING(255),
       allowNull: true,
     },
     created_at: {

@@ -90,7 +90,7 @@ export const METRIC_CONFIG: MetricConfigMap = {
     label: "Pas",
     unit: "count",
     direction: METRIC_DIRECTIONS.HIGHER_IS_BETTER,
-    validRange: { min: 0, max: 300 },
+    validRange: { min: 0, max: 60 },
   },
   bmi: {
     ...baseMetricConfig,

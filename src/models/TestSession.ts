@@ -10,6 +10,8 @@ interface TestSessionAttributes {
   club_responsible_phone: string | null;
   city: string;
   sport_type: string;
+  vald_enabled: boolean;
+  vald_config: Record<string, any>;
   test_date: Date;
   status: "draft" | "in_progress" | "completed";
   notes: string | null;
@@ -23,6 +25,8 @@ interface TestSessionCreationAttributes
     | "id"
     | "club_responsible_email"
     | "club_responsible_phone"
+    | "vald_enabled"
+    | "vald_config"
     | "status"
     | "notes"
     | "created_at"
@@ -40,6 +44,8 @@ class TestSession
   public club_responsible_phone!: string | null;
   public city!: string;
   public sport_type!: string;
+  public vald_enabled!: boolean;
+  public vald_config!: Record<string, any>;
   public test_date!: Date;
   public status!: "draft" | "in_progress" | "completed";
   public notes!: string | null;
@@ -77,6 +83,20 @@ TestSession.init(
     sport_type: {
       type: DataTypes.STRING(100),
       allowNull: false,
+    },
+    vald_enabled: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
+    vald_config: {
+      type: DataTypes.JSONB,
+      allowNull: false,
+      defaultValue: {
+        schemaVersion: 1,
+        disabledManualFields: [],
+        expectedMetrics: [],
+      },
     },
     test_date: {
       type: DataTypes.DATE,

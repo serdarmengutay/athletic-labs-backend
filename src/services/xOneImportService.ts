@@ -21,31 +21,18 @@ export interface NormalizedXOneMetrics {
   fatigueIndex: number | null;
 }
 
+export interface NormalizedYoujiSummary {
+  measurementTime: string | null;
+  bodyFatPercent: number | null;
+  mineralAmount: number | null;
+  proteinAmount: number | null;
+  deviceSerial: string | null;
+}
+
 interface NormalizedXOnePayload {
   sections: NormalizedXOneSections;
   metrics: NormalizedXOneMetrics;
-}
-
-function calculateFfmiFromBodyFat(
-  heightCm: number | null,
-  weightKg: number | null,
-  bodyFatPercent: number | null,
-): number | null {
-  if (
-    !heightCm ||
-    !weightKg ||
-    heightCm <= 0 ||
-    weightKg <= 0 ||
-    bodyFatPercent === null ||
-    bodyFatPercent < 0 ||
-    bodyFatPercent >= 100
-  ) {
-    return null;
-  }
-
-  const heightM = heightCm / 100;
-  const leanMass = weightKg * (1 - bodyFatPercent / 100);
-  return Number((leanMass / (heightM * heightM)).toFixed(2));
+  youjiSummary: NormalizedYoujiSummary;
 }
 
 const SECTION_ALIASES: Record<keyof NormalizedXOneSections, string[]> = {
@@ -175,6 +162,41 @@ function getFirstNumericValue(
   return null;
 }
 
+function toStringOrNull(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  return null;
+}
+
+function getFirstStringValue(
+  sections: Array<Record<string, any> | null>,
+  candidates: string[],
+): string | null {
+  const normalizedCandidates = candidates.map(normalizeKey);
+
+  for (const section of sections) {
+    if (!section) continue;
+    const bucket = new Map<string, unknown>();
+    collectCandidates(section, bucket);
+
+    for (const candidate of normalizedCandidates) {
+      if (!bucket.has(candidate)) continue;
+      const stringValue = toStringOrNull(bucket.get(candidate));
+      if (stringValue !== null) {
+        return stringValue;
+      }
+    }
+  }
+
+  return null;
+}
+
 export function normalizeXOnePayload(
   rawPayload: Record<string, any>,
 ): NormalizedXOnePayload {
@@ -219,7 +241,51 @@ export function normalizeXOnePayload(
   const bodyFatPercent =
     toNumberOrNull(measurementSection?.outline?.pbf) ??
     toNumberOrNull(compositionSection?.pbf?.value) ??
-    getFirstNumericValue(searchSections, ["pbf", "bodyFatPercent"]);
+    getFirstNumericValue(searchSections, [
+      "pbf",
+      "bodyFatPercent",
+      "bodyFat",
+      "fatPercent",
+      "percentBodyFat",
+    ]);
+  const mineralAmount =
+    toNumberOrNull(compositionSection?.mineral?.value) ??
+    getFirstNumericValue(searchSections, [
+      "mineral",
+      "minerals",
+      "mineralAmount",
+      "mineralMass",
+      "boneMineralContent",
+    ]);
+  const proteinAmount =
+    toNumberOrNull(compositionSection?.protein?.value) ??
+    getFirstNumericValue(searchSections, [
+      "protein",
+      "proteinAmount",
+      "proteinMass",
+    ]);
+  const measurementTime =
+    toStringOrNull(measurementSection?.start_time) ??
+    toStringOrNull(measurementSection?.created_at) ??
+    getFirstStringValue(searchSections, [
+      "measuredAt",
+      "measurementTime",
+      "measurementDate",
+      "measureTime",
+      "testTime",
+      "createdAt",
+      "created_at",
+      "time",
+      "date",
+    ]);
+  const deviceSerial = getFirstStringValue(searchSections, [
+    "deviceSn",
+    "deviceSN",
+    "device_sn",
+    "deviceSerial",
+    "serialNumber",
+    "sn",
+  ]);
 
   const baseMetrics = {
     height,
@@ -239,8 +305,17 @@ export function normalizeXOnePayload(
   };
 
   const ffmiSource =
-    getFirstNumericValue(searchSections, ["ffmi"]) ??
-    calculateFfmiFromBodyFat(height, weight, bodyFatPercent);
+    toNumberOrNull(measurementSection?.outline?.ffmi) ??
+    toNumberOrNull(compositionSection?.ffmi?.value) ??
+    getFirstNumericValue(searchSections, [
+      "ffmi",
+      "fatFreeMassIndex",
+      "fat_free_mass_index",
+      "fatFreeIndex",
+      "fat_free_index",
+      "strongIndex",
+      "strong_index",
+    ]);
   const fatigueSource = getFirstNumericValue(searchSections, [
     "fatigueIndex",
     "fatigue_index",
@@ -262,6 +337,13 @@ export function normalizeXOnePayload(
       bmi: bmiSource ?? derivedBmi,
       ffmi: ffmiSource,
       fatigueIndex: fatigueSource ?? derivedFatigue,
+    },
+    youjiSummary: {
+      measurementTime,
+      bodyFatPercent,
+      mineralAmount,
+      proteinAmount,
+      deviceSerial,
     },
   };
 }

@@ -9,6 +9,7 @@ import {
   sequelize,
 } from "../models";
 import { Op, UniqueConstraintError } from "sequelize";
+import * as XLSX from "xlsx";
 import { normalizeGender } from "../config/gender";
 import {
   generateAthleteReport,
@@ -30,6 +31,136 @@ const REQUIRED_MEASUREMENT_FIELDS = [
   "vertical_jump",
   "pass_count",
 ];
+
+function requiredMeasurementFields(valdEnabled: boolean): string[] {
+  return valdEnabled
+    ? REQUIRED_MEASUREMENT_FIELDS.filter((field) => field !== "vertical_jump")
+    : REQUIRED_MEASUREMENT_FIELDS;
+}
+
+function applyTemporaryValdReportRules(
+  report: FrontendAthleteReport,
+  valdEnabled: boolean,
+): FrontendAthleteReport {
+  if (!valdEnabled) return report;
+
+  report.metrics.verticalJump = {
+    value: null,
+    score: null,
+    percentile: null,
+    target: null,
+  };
+  if (report.measurements) {
+    delete report.measurements.verticalJump;
+  }
+  if (report.ageGroupAverages) {
+    report.ageGroupAverages.verticalJump = null;
+  }
+  if (report.ageGroupPercentiles) {
+    report.ageGroupPercentiles.verticalJump = null;
+  }
+
+  const includedScores = [
+    report.metrics.sprint1.score,
+    report.metrics.sprint2.score,
+    report.metrics.agility.score,
+    report.metrics.flexibility.score,
+    report.metrics.passCount.score,
+  ].filter((score): score is number => score !== null && score !== undefined);
+  report.overallPerformance =
+    includedScores.length > 0
+      ? Number(
+          (
+            includedScores.reduce((sum, score) => sum + score, 0) /
+            includedScores.length
+          ).toFixed(1),
+        )
+      : 0;
+
+  return report;
+}
+
+const DEFAULT_VALD_CONFIG = {
+  schemaVersion: 1,
+  disabledManualFields: [],
+  expectedMetrics: [],
+};
+
+function normalizeValdConfig(value: unknown): Record<string, any> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return { ...DEFAULT_VALD_CONFIG };
+  }
+
+  const config = value as Record<string, unknown>;
+  return {
+    ...config,
+    schemaVersion:
+      typeof config.schemaVersion === "number" ? config.schemaVersion : 1,
+    disabledManualFields: Array.isArray(config.disabledManualFields)
+      ? config.disabledManualFields
+      : [],
+    expectedMetrics: Array.isArray(config.expectedMetrics)
+      ? config.expectedMetrics
+      : [],
+  };
+}
+
+function parseDateOrNull(value: string | null): Date | null {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function numberOrUndefined(value: unknown): number | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function excelNumber(value: unknown): number | null {
+  const parsed = numberOrUndefined(value);
+  return parsed === undefined ? null : parsed;
+}
+
+function formatExcelDate(value: Date | string | null | undefined): string {
+  if (!value) return "";
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return parsed.toLocaleString("tr-TR", {
+    timeZone: "Europe/Istanbul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function safeFileName(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9_-]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 80);
+}
+
+function buildYoujiSummary(
+  xOneImport?: XOneReportImport | null,
+): FrontendAthleteReport["youjiSummary"] | undefined {
+  if (!xOneImport?.qr_url) return undefined;
+
+  return {
+    deviceReportUrl: xOneImport.qr_url,
+    reportId: xOneImport.report_id,
+    measurementTime: xOneImport.measurement_time
+      ? xOneImport.measurement_time.toISOString()
+      : undefined,
+    bodyFatPercent: numberOrUndefined(xOneImport.body_fat_percent),
+    mineralAmount: numberOrUndefined(xOneImport.mineral_amount),
+    proteinAmount: numberOrUndefined(xOneImport.protein_amount),
+  };
+}
 
 /**
  * POST /api/test-sessions/:id/calculate-report
@@ -77,6 +208,22 @@ export const calculateReport = async (req: Request, res: Response) => {
       });
     }
 
+    const xOneImports = await XOneReportImport.findAll({
+      where: {
+        athlete_test_id: athleteTests.map((athleteTest) => athleteTest.id),
+      },
+      order: [["created_at", "DESC"]],
+    });
+    const latestXOneImportByAthleteTestId = new Map<string, XOneReportImport>();
+    for (const xOneImport of xOneImports) {
+      if (!latestXOneImportByAthleteTestId.has(xOneImport.athlete_test_id)) {
+        latestXOneImportByAthleteTestId.set(
+          xOneImport.athlete_test_id,
+          xOneImport,
+        );
+      }
+    }
+
     // 3. Generate reports for each athlete
     const athletes: FrontendAthleteReport[] = [];
     const warnings: { athleteId: string; fullName: string; warning: string }[] =
@@ -88,10 +235,16 @@ export const calculateReport = async (req: Request, res: Response) => {
 
       try {
         // generateFrontendAthleteReport handles missing measurements and benchmark data gracefully
-        const report = await generateFrontendAthleteReport(
-          athleteTest,
-          measurement,
+        const report = applyTemporaryValdReportRules(
+          await generateFrontendAthleteReport(athleteTest, measurement),
+          testSession.vald_enabled,
         );
+        const youjiSummary = buildYoujiSummary(
+          latestXOneImportByAthleteTestId.get(athleteTest.id),
+        );
+        if (youjiSummary) {
+          report.youjiSummary = youjiSummary;
+        }
         athletes.push(report);
 
         // Add warning if no benchmark data (percentiles will be null)
@@ -137,6 +290,9 @@ export const calculateReport = async (req: Request, res: Response) => {
             bmi: { value: null, score: null, percentile: null, target: null },
             fatigueIndex: { value: null, score: null, percentile: null, target: null },
           },
+          youjiSummary: buildYoujiSummary(
+            latestXOneImportByAthleteTestId.get(athleteTest.id),
+          ),
           overallPerformance: 0,
         });
 
@@ -158,6 +314,7 @@ export const calculateReport = async (req: Request, res: Response) => {
     return res.status(200).json({
       testSessionId: id,
       clubName: testSession.club_name,
+      valdEnabled: testSession.vald_enabled,
       testDate: testSession.test_date,
       reportGeneratedAt: new Date().toISOString(),
       athletes,
@@ -189,6 +346,8 @@ export const createTestSession = async (req: Request, res: Response) => {
       sportType,
       testDate,
       notes,
+      valdEnabled = false,
+      valdConfig,
     } = req.body;
 
     // Validation
@@ -207,6 +366,8 @@ export const createTestSession = async (req: Request, res: Response) => {
       club_responsible_phone: clubResponsiblePhone || null,
       city,
       sport_type: sportType,
+      vald_enabled: Boolean(valdEnabled),
+      vald_config: normalizeValdConfig(valdConfig),
       test_date: new Date(testDate),
       status: "draft", // Default status
       notes: notes || null,
@@ -222,6 +383,8 @@ export const createTestSession = async (req: Request, res: Response) => {
         clubResponsiblePhone: testSession.club_responsible_phone,
         city: testSession.city,
         sportType: testSession.sport_type,
+        valdEnabled: testSession.vald_enabled,
+        valdConfig: testSession.vald_config,
         testDate: testSession.test_date,
         status: testSession.status,
         notes: testSession.notes,
@@ -429,6 +592,215 @@ export const getSessionAthletes = async (req: Request, res: Response) => {
 };
 
 /**
+ * GET /api/test-sessions/:testSessionId/field-data.xlsx
+ * Export the latest central field-test data as a single workbook.
+ */
+export const exportSessionFieldData = async (req: Request, res: Response) => {
+  try {
+    const { testSessionId } = req.params;
+    const testSession = await TestSession.findByPk(testSessionId);
+
+    if (!testSession) {
+      return res.status(404).json({
+        success: false,
+        message: "Test oturumu bulunamadı",
+      });
+    }
+
+    const athleteTests = await AthleteTest.findAll({
+      where: { test_session_id: testSessionId },
+      include: [
+        { association: "athlete" },
+        { association: "measurement" },
+        { association: "xOneImports" },
+      ],
+      order: [["created_at", "ASC"]],
+    });
+
+    const rows = athleteTests.map((athleteTest: any, index) => {
+      const athlete = athleteTest.athlete;
+      const measurement = athleteTest.measurement;
+      const latestXOneImport = [...(athleteTest.xOneImports || [])].sort(
+        (left: XOneReportImport, right: XOneReportImport) =>
+          right.created_at.getTime() - left.created_at.getTime(),
+      )[0];
+
+      const height = excelNumber(measurement?.height);
+      const weight = excelNumber(measurement?.weight);
+      const sprintFirst = excelNumber(measurement?.sprint_30m);
+      const sprintSecond = excelNumber(measurement?.sprint_30m_second);
+      const bmi =
+        excelNumber(measurement?.bmi) ??
+        (height && weight
+          ? Number((weight / Math.pow(height / 100, 2)).toFixed(2))
+          : null);
+      const fatigueIndex =
+        excelNumber(measurement?.fatigue_index) ??
+        (sprintFirst && sprintSecond
+          ? Number(
+              (((sprintSecond - sprintFirst) / sprintFirst) * 100).toFixed(2),
+            )
+          : null);
+
+      const requiredValues: Record<string, number | null> = {
+        Boy: height,
+        Kilo: weight,
+        Esneklik: excelNumber(measurement?.flexibility),
+        "30m 1": sprintFirst,
+        Çeviklik: excelNumber(measurement?.agility),
+        Pas: excelNumber(measurement?.pass_count),
+      };
+      if (!testSession.vald_enabled) {
+        requiredValues["Dikey Sıçrama"] = excelNumber(
+          measurement?.vertical_jump,
+        );
+      }
+      const missingFields = Object.entries(requiredValues)
+        .filter(([, value]) => value === null)
+        .map(([label]) => label);
+
+      return {
+        Sıra: index + 1,
+        "Sporcu ID": athlete?.id || "",
+        "Sporcu Test ID": athleteTest.id,
+        "Ad Soyad": athlete?.full_name || "",
+        "Doğum Tarihi": athlete?.birth_date || "",
+        "Doğum Yılı": athlete?.birth_year || "",
+        Cinsiyet: athlete?.gender || "",
+        Durum: athleteTest.status || "active",
+        "Kayıt Durumu":
+          athleteTest.status === "absent"
+            ? "Gelmedi"
+            : missingFields.length === 0
+              ? "Tamamlandı"
+              : measurement
+                ? "Kısmi"
+                : "Boş",
+        "Eksik Alanlar": missingFields.join(", "),
+        "Boy (cm)": height,
+        "Kilo (kg)": weight,
+        VKI: bmi,
+        FFMI: excelNumber(measurement?.ffmi),
+        "Mineral Miktarı (kg)": excelNumber(
+          latestXOneImport?.mineral_amount,
+        ),
+        "Vücuttaki Protein Miktarı (kg)": excelNumber(
+          latestXOneImport?.protein_amount,
+        ),
+        "Youji Rapor URL": latestXOneImport?.qr_url || "",
+        "Youji Rapor ID": latestXOneImport?.report_id || "",
+        "Youji Ölçüm Tarihi": formatExcelDate(
+          latestXOneImport?.measurement_time,
+        ),
+        "Esneklik (cm)": excelNumber(measurement?.flexibility),
+        "30m 1 (sn)": sprintFirst,
+        "30m 2 (sn)": sprintSecond,
+        "Yorgunluk Endeksi (%)": fatigueIndex,
+        "Çeviklik (sn)": excelNumber(measurement?.agility),
+        "Dikey Sıçrama (cm)": excelNumber(measurement?.vertical_jump),
+        "Pas (adet/30sn)": excelNumber(measurement?.pass_count),
+        "Youji QR Girildi": latestXOneImport ? "Evet" : "Hayır",
+        "Son Güncelleme": formatExcelDate(
+          measurement?.updated_at || athleteTest.updated_at,
+        ),
+        "VALD Athlete ID": "",
+        "VALD Test Tarihi": "",
+        "VALD Veri Kaynağı": "",
+        "VALD Notları": "",
+      };
+    });
+
+    const workbook = XLSX.utils.book_new();
+    const dataSheet = XLSX.utils.json_to_sheet(rows);
+    dataSheet["!autofilter"] = {
+      ref: dataSheet["!ref"] || "A1:AB1",
+    };
+    dataSheet["!cols"] = [
+      { wch: 6 },
+      { wch: 38 },
+      { wch: 38 },
+      { wch: 28 },
+      { wch: 14 },
+      { wch: 12 },
+      { wch: 10 },
+      { wch: 12 },
+      { wch: 16 },
+      { wch: 30 },
+      { wch: 18 },
+      { wch: 24 },
+      { wch: 28 },
+      { wch: 55 },
+      { wch: 22 },
+      ...Array.from({ length: 11 }, () => ({ wch: 18 })),
+      { wch: 18 },
+      { wch: 22 },
+      { wch: 24 },
+      { wch: 20 },
+      { wch: 20 },
+      { wch: 35 },
+    ];
+    XLSX.utils.book_append_sheet(workbook, dataSheet, "Saha Verileri");
+
+    const sessionSheet = XLSX.utils.json_to_sheet([
+      {
+        "Oturum ID": testSession.id,
+        Kulüp: testSession.club_name,
+        Şehir: testSession.city,
+        Spor: testSession.sport_type,
+        "Test Tarihi": formatExcelDate(testSession.test_date),
+        "VALD Modu": testSession.vald_enabled ? "Var" : "Yok",
+        "Toplam Sporcu": athleteTests.length,
+        "Dosya Oluşturma": formatExcelDate(new Date()),
+      },
+    ]);
+    sessionSheet["!cols"] = Array.from({ length: 8 }, () => ({ wch: 24 }));
+    XLSX.utils.book_append_sheet(workbook, sessionSheet, "Oturum Bilgileri");
+
+    const instructionsSheet = XLSX.utils.aoa_to_sheet([
+      ["VALD SONRASI EŞLEŞTİRME"],
+      [
+        "Sporcuları mümkünse Sporcu ID / Sporcu Test ID ile eşleştirin. İsim tek başına güvenli eşleştirme anahtarı değildir.",
+      ],
+      [
+        "Yeni VALD metriklerini Saha Verileri sayfasının sağına yeni sütunlar olarak ekleyebilirsiniz.",
+      ],
+      [
+        "Orijinal Sporcu ID ve Sporcu Test ID sütunlarını değiştirmeyin veya silmeyin.",
+      ],
+    ]);
+    instructionsSheet["!cols"] = [{ wch: 120 }];
+    XLSX.utils.book_append_sheet(workbook, instructionsSheet, "VALD Notları");
+
+    const buffer = XLSX.write(workbook, {
+      type: "buffer",
+      bookType: "xlsx",
+    });
+    const datePart = new Date(testSession.test_date)
+      .toISOString()
+      .slice(0, 10);
+    const fileName = `${safeFileName(testSession.club_name) || "test"}_${datePart}_saha_verileri.xlsx`;
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`,
+    );
+    res.setHeader("Cache-Control", "no-store");
+    return res.status(200).send(buffer);
+  } catch (error) {
+    console.error("exportSessionFieldData error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Excel saha yedeği oluşturulurken hata oluştu",
+      error: error instanceof Error ? error.message : "Bilinmeyen hata",
+    });
+  }
+};
+
+/**
  * POST /api/athlete-tests/:athleteTestId/measurements
  * Save or update measurements for an athlete test
  */
@@ -438,7 +810,9 @@ export const saveMeasurements = async (req: Request, res: Response) => {
     const measurementData = req.body;
 
     // Validate athlete test exists
-    const athleteTest = await AthleteTest.findByPk(athleteTestId);
+    const athleteTest = await AthleteTest.findByPk(athleteTestId, {
+      include: [{ association: "testSession" }],
+    });
     if (!athleteTest) {
       return res.status(404).json({
         success: false,
@@ -486,7 +860,9 @@ export const saveMeasurements = async (req: Request, res: Response) => {
     }
 
     // Check if all required fields are filled
-    const isComplete = REQUIRED_MEASUREMENT_FIELDS.every(
+    const isComplete = requiredMeasurementFields(
+      Boolean((athleteTest as any).testSession?.vald_enabled),
+    ).every(
       (field) => measurement![field as keyof typeof measurement] !== null,
     );
 
@@ -754,6 +1130,22 @@ export const importXOneQr = async (req: Request, res: Response) => {
               posture: normalized.sections.posture,
               balance: normalized.sections.balance,
             },
+            youjiSummary: {
+              deviceReportUrl: duplicateAfterResolve.qr_url,
+              reportId: duplicateAfterResolve.report_id,
+              measurementTime: duplicateAfterResolve.measurement_time
+                ? duplicateAfterResolve.measurement_time.toISOString()
+                : normalized.youjiSummary.measurementTime,
+              bodyFatPercent:
+                numberOrUndefined(duplicateAfterResolve.body_fat_percent) ??
+                normalized.youjiSummary.bodyFatPercent,
+              mineralAmount:
+                numberOrUndefined(duplicateAfterResolve.mineral_amount) ??
+                normalized.youjiSummary.mineralAmount,
+              proteinAmount:
+                numberOrUndefined(duplicateAfterResolve.protein_amount) ??
+                normalized.youjiSummary.proteinAmount,
+            },
             duplicate: true,
             refreshedForTest: true,
           },
@@ -773,6 +1165,9 @@ export const importXOneQr = async (req: Request, res: Response) => {
     }
 
     const mappedMeasurementData: Record<string, number> = {};
+    const measurementTime = parseDateOrNull(
+      normalized.youjiSummary.measurementTime,
+    );
 
     if (normalized.metrics.height !== null) {
       mappedMeasurementData.height = normalized.metrics.height;
@@ -824,6 +1219,11 @@ export const importXOneQr = async (req: Request, res: Response) => {
             measurement: normalized.sections.measurement,
             posture: normalized.sections.posture,
             balance: normalized.sections.balance,
+            measurement_time: measurementTime,
+            body_fat_percent: normalized.youjiSummary.bodyFatPercent,
+            mineral_amount: normalized.youjiSummary.mineralAmount,
+            protein_amount: normalized.youjiSummary.proteinAmount,
+            device_serial: normalized.youjiSummary.deviceSerial,
           },
           { transaction },
         );
@@ -846,7 +1246,7 @@ export const importXOneQr = async (req: Request, res: Response) => {
         }
 
         const isComplete = measurement
-          ? REQUIRED_MEASUREMENT_FIELDS.every(
+          ? requiredMeasurementFields(testSession.vald_enabled).every(
               (field) =>
                 measurement![field as keyof Measurement] !== null &&
                 measurement![field as keyof Measurement] !== undefined,
@@ -905,6 +1305,14 @@ export const importXOneQr = async (req: Request, res: Response) => {
             measurement: normalized.sections.measurement,
             posture: normalized.sections.posture,
             balance: normalized.sections.balance,
+          },
+          youjiSummary: {
+            deviceReportUrl: parsedQr.qrUrl,
+            reportId: String(resolvedReportId),
+            measurementTime: normalized.youjiSummary.measurementTime,
+            bodyFatPercent: normalized.youjiSummary.bodyFatPercent,
+            mineralAmount: normalized.youjiSummary.mineralAmount,
+            proteinAmount: normalized.youjiSummary.proteinAmount,
           },
         },
       });
@@ -1017,6 +1425,8 @@ export const getAllTestSessions = async (_req: Request, res: Response) => {
           clubResponsibleName: session.club_responsible_name,
           city: session.city,
           sportType: session.sport_type,
+          valdEnabled: session.vald_enabled,
+          valdConfig: session.vald_config,
           testDate: session.test_date,
           status: session.status,
           totalAthletes,
@@ -1075,6 +1485,8 @@ export const getTestSessionById = async (req: Request, res: Response) => {
         clubResponsiblePhone: testSession.club_responsible_phone,
         city: testSession.city,
         sportType: testSession.sport_type,
+        valdEnabled: testSession.vald_enabled,
+        valdConfig: testSession.vald_config,
         testDate: testSession.test_date,
         status: testSession.status,
         notes: testSession.notes,

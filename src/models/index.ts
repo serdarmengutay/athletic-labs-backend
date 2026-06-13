@@ -8,6 +8,7 @@ import Measurement from "./Measurement";
 import HistoricalAthleteData from "./HistoricalAthleteData";
 import XOneReportImport from "./XOneReportImport";
 import YoujiuPushLog from "./YoujiuPushLog";
+import ValdResultImport from "./ValdResultImport";
 
 // TODO MVP: Commented out models - re-enable after MVP
 /*
@@ -58,6 +59,24 @@ AthleteTest.hasMany(XOneReportImport, {
   as: "xOneImports",
 });
 XOneReportImport.belongsTo(AthleteTest, {
+  foreignKey: "athlete_test_id",
+  as: "athleteTest",
+});
+
+TestSession.hasMany(ValdResultImport, {
+  foreignKey: "test_session_id",
+  as: "valdImports",
+});
+ValdResultImport.belongsTo(TestSession, {
+  foreignKey: "test_session_id",
+  as: "testSession",
+});
+
+AthleteTest.hasMany(ValdResultImport, {
+  foreignKey: "athlete_test_id",
+  as: "valdImports",
+});
+ValdResultImport.belongsTo(AthleteTest, {
   foreignKey: "athlete_test_id",
   as: "athleteTest",
 });
@@ -169,6 +188,7 @@ export {
   HistoricalAthleteData,
   XOneReportImport,
   YoujiuPushLog,
+  ValdResultImport,
   // TODO MVP: Commented out exports
   // Club,
   // TestResult,

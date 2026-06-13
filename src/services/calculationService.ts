@@ -600,7 +600,7 @@ export async function generateAthleteReport(
     vertical_jump: measurement.vertical_jump,
     pass_count: measurement.pass_count,
     bmi: derived.bmi,
-    ffmi: derived.ffmi,
+    ffmi: measurement.ffmi,
     fatigue_index: derived.fatigueIndex,
   };
 
@@ -623,7 +623,7 @@ export async function generateAthleteReport(
       verticalJump: measurement.vertical_jump,
       passCount: measurement.pass_count,
       bmi: derived.bmi,
-      ffmi: derived.ffmi,
+      ffmi: measurement.ffmi,
       fatigueIndex: derived.fatigueIndex,
     },
     percentiles,
@@ -658,6 +658,8 @@ export interface FrontendAthleteReport {
   measurements?: {
     height?: number;
     weight?: number;
+    bmi?: number;
+    ffmi?: number;
     flexibility?: number;
     sprint30m?: number;
     sprint30mSecond?: number;
@@ -692,6 +694,14 @@ export interface FrontendAthleteReport {
     passCount: MetricResult;
     bmi: MetricResult;
     fatigueIndex: MetricResult;
+  };
+  youjiSummary?: {
+    deviceReportUrl: string;
+    reportId: string;
+    measurementTime?: string;
+    bodyFatPercent?: number;
+    mineralAmount?: number;
+    proteinAmount?: number;
   };
   overallPerformance: number;
 }
@@ -819,6 +829,7 @@ function applyFallbackAverages(
       ageGroupAverages.verticalJump ?? fallbackAverage("vertical_jump"),
     passCount:
       ageGroupAverages.passCount ??
+      fallbackAverage("pass_count") ??
       (athlete.gender === "female"
         ? null
         : Number(
@@ -1077,6 +1088,11 @@ export async function generateFrontendAthleteReport(
       weight:
         measurement.weight !== null && measurement.weight !== undefined
           ? Number(measurement.weight)
+          : undefined,
+      bmi: derived.bmi ?? undefined,
+      ffmi:
+        measurement.ffmi !== null && measurement.ffmi !== undefined
+          ? Number(measurement.ffmi)
           : undefined,
       flexibility: fullMeasurement.flexibility ?? undefined,
       sprint30m: fullMeasurement.sprint_30m ?? undefined,

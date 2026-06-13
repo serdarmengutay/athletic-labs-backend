@@ -12,6 +12,8 @@ export const createTestSession = async (req: Request, res: Response) => {
       club_responsible_phone,
       city,
       sport_type,
+      vald_enabled = false,
+      vald_config,
       test_date,
       notes,
     } = req.body;
@@ -37,6 +39,15 @@ export const createTestSession = async (req: Request, res: Response) => {
       club_responsible_phone,
       city,
       sport_type,
+      vald_enabled: Boolean(vald_enabled),
+      vald_config:
+        vald_config && typeof vald_config === "object"
+          ? vald_config
+          : {
+              schemaVersion: 1,
+              disabledManualFields: [],
+              expectedMetrics: [],
+            },
       test_date: new Date(test_date),
       notes,
     });

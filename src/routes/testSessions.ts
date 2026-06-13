@@ -9,6 +9,7 @@ import {
   saveMeasurements,
   calculateReport,
   importXOneQr,
+  exportSessionFieldData,
 } from "../controllers/testSessionController";
 
 const router = Router();
@@ -16,6 +17,7 @@ const router = Router();
 // Test Session CRUD
 router.post("/", createTestSession);
 router.get("/", getAllTestSessions);
+router.get("/:testSessionId/field-data.xlsx", exportSessionFieldData);
 router.get("/:id", getTestSessionById);
 router.get("/:id/status", getSessionStatus);
 
