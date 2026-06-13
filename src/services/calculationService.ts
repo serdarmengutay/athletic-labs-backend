@@ -4,6 +4,7 @@
  */
 
 import { HistoricalAthleteData, Measurement } from "../models";
+import { classifyMaleFootballHandgrip } from "../config/handgripBenchmarks";
 import sequelize from "../config/database";
 import { Op, QueryTypes } from "sequelize";
 import {
@@ -666,6 +667,8 @@ export interface FrontendAthleteReport {
     agility?: number;
     verticalJump?: number;
     passCount?: number;
+    handgrip?: number;
+    handgripCategory?: "Ortalama" | "İyi" | "Çok İyi";
   };
   ageGroupAverages: {
     sprint1: number | null;
@@ -1120,6 +1123,20 @@ export async function generateFrontendAthleteReport(
       agility: fullMeasurement.agility ?? undefined,
       verticalJump: fullMeasurement.vertical_jump ?? undefined,
       passCount: fullMeasurement.pass_count ?? undefined,
+      handgrip:
+        measurement.handgrip !== null && measurement.handgrip !== undefined
+          ? Number(measurement.handgrip)
+          : undefined,
+      handgripCategory:
+        athleteGender === "male" &&
+        !athleteTest.testSession?.sport_type
+          ?.toLocaleLowerCase("tr")
+          .includes("voley")
+          ? classifyMaleFootballHandgrip(
+              athlete.birth_year,
+              measurement.handgrip,
+            ) ?? undefined
+          : undefined,
     },
     ageGroupAverages,
     ageGroupPercentiles,

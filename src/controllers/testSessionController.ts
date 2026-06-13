@@ -566,6 +566,7 @@ export const getSessionAthletes = async (req: Request, res: Response) => {
             agility: at.measurement.agility,
             verticalJump: at.measurement.vertical_jump,
             passCount: at.measurement.pass_count,
+            handgrip: at.measurement.handgrip,
             bmi: at.measurement.bmi,
             ffmi: at.measurement.ffmi,
             fatigueIndex: at.measurement.fatigue_index,
@@ -699,6 +700,7 @@ export const exportSessionFieldData = async (req: Request, res: Response) => {
         "Çeviklik (sn)": excelNumber(measurement?.agility),
         "Dikey Sıçrama (cm)": excelNumber(measurement?.vertical_jump),
         "Pas (adet/30sn)": excelNumber(measurement?.pass_count),
+        "Handgrip (kg)": excelNumber(measurement?.handgrip),
         "Youji QR Girildi": latestXOneImport ? "Evet" : "Hayır",
         "Son Güncelleme": formatExcelDate(
           measurement?.updated_at || athleteTest.updated_at,
@@ -839,6 +841,7 @@ export const getMeasurements = async (req: Request, res: Response) => {
               agility: measurement.agility,
               verticalJump: measurement.vertical_jump,
               passCount: measurement.pass_count,
+              handgrip: measurement.handgrip,
               bmi: measurement.bmi,
               ffmi: measurement.ffmi,
               fatigueIndex: measurement.fatigue_index,
@@ -902,6 +905,8 @@ export const saveMeasurements = async (req: Request, res: Response) => {
       mappedData.vertical_jump = measurementData.verticalJump;
     if (measurementData.passCount !== undefined)
       mappedData.pass_count = measurementData.passCount;
+    if (measurementData.handgrip !== undefined)
+      mappedData.handgrip = measurementData.handgrip;
     if (measurementData.bmi !== undefined) mappedData.bmi = measurementData.bmi;
     if (measurementData.ffmi !== undefined)
       mappedData.ffmi = measurementData.ffmi;
@@ -945,6 +950,7 @@ export const saveMeasurements = async (req: Request, res: Response) => {
         agility: measurement.agility,
         verticalJump: measurement.vertical_jump,
         passCount: measurement.pass_count,
+        handgrip: measurement.handgrip,
         bmi: measurement.bmi,
         ffmi: measurement.ffmi,
         fatigueIndex: measurement.fatigue_index,
