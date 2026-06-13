@@ -1051,8 +1051,28 @@ export async function generateFrontendAthleteReport(
     verticalJump: buildMetric(fullMeasurement.vertical_jump, "vertical_jump"),
     passCount: {
       value: fullMeasurement.pass_count,
-      score: buildMetric(fullMeasurement.pass_count, "pass_count").score,
-      percentile: buildMetric(fullMeasurement.pass_count, "pass_count").percentile,
+      score:
+        calculateFallbackScore(
+          buildFallbackInput(
+            athleteTest,
+            athlete,
+            "pass_count",
+            fullMeasurement.pass_count,
+          ),
+        ) ?? buildMetric(fullMeasurement.pass_count, "pass_count").score,
+      percentile: (() => {
+        const benchmarkScore = calculateFallbackScore(
+          buildFallbackInput(
+            athleteTest,
+            athlete,
+            "pass_count",
+            fullMeasurement.pass_count,
+          ),
+        );
+        return benchmarkScore !== null
+          ? Number((100 - benchmarkScore).toFixed(1))
+          : buildMetric(fullMeasurement.pass_count, "pass_count").percentile;
+      })(),
       target:
         fullMeasurement.pass_count !== null
           ? Math.ceil(fullMeasurement.pass_count * 1.12)

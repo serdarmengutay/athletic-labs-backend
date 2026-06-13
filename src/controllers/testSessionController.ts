@@ -801,6 +801,65 @@ export const exportSessionFieldData = async (req: Request, res: Response) => {
 };
 
 /**
+ * GET /api/athlete-tests/:athleteTestId/measurements
+ * Fetch the latest measurements for one athlete without loading the full session.
+ */
+export const getMeasurements = async (req: Request, res: Response) => {
+  try {
+    const { athleteTestId } = req.params;
+    const athleteTest = await AthleteTest.findByPk(athleteTestId, {
+      include: [{ association: "measurement" }],
+    });
+    if (!athleteTest) {
+      return res.status(404).json({
+        success: false,
+        message: "Sporcu testi bulunamadı",
+      });
+    }
+
+    const measurement = (athleteTest as any).measurement as Measurement | null;
+    const xOneImport = await XOneReportImport.findOne({
+      where: { athlete_test_id: athleteTestId },
+      order: [["created_at", "DESC"]],
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        athleteTestId,
+        status: athleteTest.status,
+        isComplete: athleteTest.is_completed,
+        measurement: measurement
+          ? {
+              height: measurement.height,
+              weight: measurement.weight,
+              flexibility: measurement.flexibility,
+              sprint30m: measurement.sprint_30m,
+              sprint30mSecond: measurement.sprint_30m_second,
+              agility: measurement.agility,
+              verticalJump: measurement.vertical_jump,
+              passCount: measurement.pass_count,
+              bmi: measurement.bmi,
+              ffmi: measurement.ffmi,
+              fatigueIndex: measurement.fatigue_index,
+            }
+          : {},
+        xOneQrImported: Boolean(xOneImport),
+        xOneReportId: xOneImport?.report_id ?? null,
+        xOneImportedAt: xOneImport?.created_at?.toISOString() ?? null,
+      },
+    });
+  } catch (error) {
+    console.error("getMeasurements error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Ölçümler getirilirken hata oluştu",
+      error: error instanceof Error ? error.message : "Bilinmeyen hata",
+    });
+  }
+};
+
+/**
  * POST /api/athlete-tests/:athleteTestId/measurements
  * Save or update measurements for an athlete test
  */
