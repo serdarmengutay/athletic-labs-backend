@@ -61,23 +61,6 @@ function applyTemporaryValdReportRules(
     report.ageGroupPercentiles.verticalJump = null;
   }
 
-  const includedScores = [
-    report.metrics.sprint1.score,
-    report.metrics.sprint2.score,
-    report.metrics.agility.score,
-    report.metrics.flexibility.score,
-    report.metrics.passCount.score,
-  ].filter((score): score is number => score !== null && score !== undefined);
-  report.overallPerformance =
-    includedScores.length > 0
-      ? Number(
-          (
-            includedScores.reduce((sum, score) => sum + score, 0) /
-            includedScores.length
-          ).toFixed(1),
-        )
-      : 0;
-
   return report;
 }
 

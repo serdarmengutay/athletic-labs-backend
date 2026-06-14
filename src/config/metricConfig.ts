@@ -50,6 +50,20 @@ const baseMetricConfig = {
 };
 
 export const METRIC_CONFIG: MetricConfigMap = {
+  height: {
+    ...baseMetricConfig,
+    label: "Boy",
+    unit: "cm",
+    direction: METRIC_DIRECTIONS.HIGHER_IS_BETTER,
+    validRange: { min: 70, max: 230 },
+  },
+  weight: {
+    ...baseMetricConfig,
+    label: "Kilo",
+    unit: "kg",
+    direction: METRIC_DIRECTIONS.HIGHER_IS_BETTER,
+    validRange: { min: 10, max: 200 },
+  },
   sprint_30m: {
     ...baseMetricConfig,
     label: "30m Sprint",

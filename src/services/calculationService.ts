@@ -134,6 +134,8 @@ interface ReferenceAthleteData {
 }
 
 const REPORT_METRIC_CONFIG: MetricConfigMap = {
+  height: BASE_METRIC_CONFIG.height,
+  weight: BASE_METRIC_CONFIG.weight,
   sprint_30m: BASE_METRIC_CONFIG.sprint_30m,
   sprint_30m_second: BASE_METRIC_CONFIG.sprint_30m_second,
   agility: BASE_METRIC_CONFIG.agility,
@@ -666,6 +668,50 @@ export interface MetricResult {
   target: number | null;
 }
 
+export function calculateWeightedTopPercentile(
+  metrics: Array<{
+    percentile: number | null | undefined;
+    weight?: number;
+  }>,
+): number {
+  const validMetrics = metrics.filter(
+    (
+      metric,
+    ): metric is {
+      percentile: number;
+      weight?: number;
+    } =>
+      metric.percentile !== null &&
+      metric.percentile !== undefined &&
+      Number.isFinite(metric.percentile) &&
+      (metric.weight ?? 1) > 0,
+  );
+
+  if (validMetrics.length === 0) return 0;
+
+  const totalWeight = validMetrics.reduce(
+    (sum, metric) => sum + (metric.weight ?? 1),
+    0,
+  );
+  const weightedPercentile = validMetrics.reduce(
+    (sum, metric) =>
+      sum +
+      Math.max(0, Math.min(100, metric.percentile)) * (metric.weight ?? 1),
+    0,
+  );
+
+  return Number((weightedPercentile / totalWeight).toFixed(1));
+}
+
+export function scoreToTopPercentile(
+  score: number | null | undefined,
+): number | null {
+  if (score === null || score === undefined || !Number.isFinite(score)) {
+    return null;
+  }
+  return Number((100 - Math.max(0, Math.min(100, score))).toFixed(1));
+}
+
 /**
  * Frontend-compatible athlete report structure
  * Field names match exactly what frontend expects
@@ -933,6 +979,14 @@ export async function generateFrontendAthleteReport(
     measurement.sprint_30m_second,
   );
   const fullMeasurement = {
+    height:
+      measurement.height !== null && measurement.height !== undefined
+        ? Number(measurement.height)
+        : null,
+    weight:
+      measurement.weight !== null && measurement.weight !== undefined
+        ? Number(measurement.weight)
+        : null,
     sprint_30m: normalizedSprints.sprint30m,
     sprint_30m_second: normalizedSprints.sprint30mSecond,
     agility:
@@ -1049,9 +1103,7 @@ export async function generateFrontendAthleteReport(
     const percentileRank =
       result?.status === COMPARISON_RESULT_STATUS.SCORED
         ? result.percentileRank
-        : score !== null
-        ? Number((100 - score).toFixed(1))
-        : null;
+        : scoreToTopPercentile(score);
 
     return {
       value,
@@ -1088,7 +1140,7 @@ export async function generateFrontendAthleteReport(
           ),
         );
         return benchmarkScore !== null
-          ? Number((100 - benchmarkScore).toFixed(1))
+          ? scoreToTopPercentile(benchmarkScore)
           : buildMetric(fullMeasurement.pass_count, "pass_count").percentile;
       })(),
       target:
@@ -1100,19 +1152,32 @@ export async function generateFrontendAthleteReport(
     fatigueIndex: buildMetric(derived.fatigueIndex, "fatigue_index"),
   };
 
-  const scoredMetrics = Object.values(metrics)
-    .map((metric) => metric.score)
-    .filter((score): score is number => score !== null && score !== undefined);
-  const overallPerformance =
-    comparison.overall.overallPercentileRank ??
-    (scoredMetrics.length > 0
-      ? Number(
-          (
-            scoredMetrics.reduce((sum, score) => sum + score, 0) /
-            scoredMetrics.length
-          ).toFixed(1),
-        )
-      : 0);
+  const heightMetric = buildMetric(fullMeasurement.height, "height");
+  const weightMetric = buildMetric(fullMeasurement.weight, "weight");
+  const valdEnabled = Boolean(athleteTest.testSession?.vald_enabled);
+  const overallPerformance = calculateWeightedTopPercentile([
+    { percentile: heightMetric.percentile, weight: REPORT_METRIC_CONFIG.height.weight },
+    { percentile: weightMetric.percentile, weight: REPORT_METRIC_CONFIG.weight.weight },
+    { percentile: metrics.sprint1.percentile, weight: REPORT_METRIC_CONFIG.sprint_30m.weight },
+    {
+      percentile: metrics.sprint2.percentile,
+      weight: REPORT_METRIC_CONFIG.sprint_30m_second.weight,
+    },
+    { percentile: metrics.agility.percentile, weight: REPORT_METRIC_CONFIG.agility.weight },
+    {
+      percentile: metrics.flexibility.percentile,
+      weight: REPORT_METRIC_CONFIG.flexibility.weight,
+    },
+    { percentile: metrics.passCount.percentile, weight: REPORT_METRIC_CONFIG.pass_count.weight },
+    ...(!valdEnabled
+      ? [
+          {
+            percentile: metrics.verticalJump.percentile,
+            weight: REPORT_METRIC_CONFIG.vertical_jump.weight,
+          },
+        ]
+      : []),
+  ]);
 
   return {
     athleteId: athlete.id,
