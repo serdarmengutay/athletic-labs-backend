@@ -22,6 +22,7 @@ import {
   calculateFallbackScore,
   getFallbackAverage,
 } from "../config/fallbackBenchmarks";
+import { normalizeSprintMeasurements } from "../utils/sprintMeasurements";
 
 // Metric configuration: which direction is "better"
 const METRIC_CONFIG: Record<string, { lowerIsBetter: boolean; label: string }> =
@@ -60,8 +61,20 @@ export function calculateFatigueIndex(
   sprint1: number,
   sprint2: number,
 ): number {
-  if (!sprint1 || !sprint2 || sprint1 <= 0) return 0;
-  return Number((((sprint2 - sprint1) / sprint1) * 100).toFixed(2));
+  const normalized = normalizeSprintMeasurements(sprint1, sprint2);
+  if (
+    normalized.sprint30m === null ||
+    normalized.sprint30mSecond === null
+  ) {
+    return 0;
+  }
+  return Number(
+    (
+      ((normalized.sprint30mSecond - normalized.sprint30m) /
+        normalized.sprint30m) *
+      100
+    ).toFixed(2),
+  );
 }
 
 function calculatePassScore(passCount: number | null, birthYear: number): number | null {
@@ -485,12 +498,17 @@ export async function getReferenceDataByBirthYear(
 export function calculateDerivedMetrics(measurement: Measurement) {
   const height = Number(measurement.height) || 0;
   const weight = Number(measurement.weight) || 0;
-  const sprint1 = Number(measurement.sprint_30m) || 0;
-  const sprint2 = Number(measurement.sprint_30m_second) || 0;
+  const normalizedSprints = normalizeSprintMeasurements(
+    measurement.sprint_30m,
+    measurement.sprint_30m_second,
+  );
   return {
     bmi: calculateBMI(height, weight),
     ffmi: calculateFFMI(height, weight),
-    fatigueIndex: calculateFatigueIndex(sprint1, sprint2),
+    fatigueIndex: calculateFatigueIndex(
+      normalizedSprints.sprint30m ?? 0,
+      normalizedSprints.sprint30mSecond ?? 0,
+    ),
   };
 }
 
@@ -910,16 +928,13 @@ export async function generateFrontendAthleteReport(
   const derived = calculateDerivedMetrics(measurement);
 
   // Build full measurement object for percentile calculation
+  const normalizedSprints = normalizeSprintMeasurements(
+    measurement.sprint_30m,
+    measurement.sprint_30m_second,
+  );
   const fullMeasurement = {
-    sprint_30m:
-      measurement.sprint_30m !== null && measurement.sprint_30m !== undefined
-        ? Number(measurement.sprint_30m)
-        : null,
-    sprint_30m_second:
-      measurement.sprint_30m_second !== null &&
-      measurement.sprint_30m_second !== undefined
-        ? Number(measurement.sprint_30m_second)
-        : null,
+    sprint_30m: normalizedSprints.sprint30m,
+    sprint_30m_second: normalizedSprints.sprint30mSecond,
     agility:
       measurement.agility !== null && measurement.agility !== undefined
         ? Number(measurement.agility)

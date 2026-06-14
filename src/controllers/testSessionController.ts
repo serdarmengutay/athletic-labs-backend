@@ -18,6 +18,7 @@ import {
   FrontendAthleteReport,
   NoBenchmarkDataError,
 } from "../services/calculationService";
+import { normalizeSprintMeasurements } from "../utils/sprintMeasurements";
 import { normalizeXOnePayload } from "../services/xOneImportService";
 import { parseYoujiuQrUrl, YoujiuApiClient } from "../services/youjiuClient";
 
@@ -628,8 +629,12 @@ export const exportSessionFieldData = async (req: Request, res: Response) => {
 
       const height = excelNumber(measurement?.height);
       const weight = excelNumber(measurement?.weight);
-      const sprintFirst = excelNumber(measurement?.sprint_30m);
-      const sprintSecond = excelNumber(measurement?.sprint_30m_second);
+      const normalizedSprints = normalizeSprintMeasurements(
+        measurement?.sprint_30m,
+        measurement?.sprint_30m_second,
+      );
+      const sprintFirst = normalizedSprints.sprint30m;
+      const sprintSecond = normalizedSprints.sprint30mSecond;
       const bmi =
         excelNumber(measurement?.bmi) ??
         (height && weight
@@ -912,6 +917,30 @@ export const saveMeasurements = async (req: Request, res: Response) => {
       mappedData.ffmi = measurementData.ffmi;
     if (measurementData.fatigueIndex !== undefined)
       mappedData.fatigue_index = measurementData.fatigueIndex;
+
+    const normalizedSprints = normalizeSprintMeasurements(
+      mappedData.sprint_30m ?? measurement?.sprint_30m,
+      mappedData.sprint_30m_second ?? measurement?.sprint_30m_second,
+    );
+    if (normalizedSprints.sprint30m !== null) {
+      mappedData.sprint_30m = normalizedSprints.sprint30m;
+    }
+    if (normalizedSprints.sprint30mSecond !== null) {
+      mappedData.sprint_30m_second = normalizedSprints.sprint30mSecond;
+    }
+    if (
+      normalizedSprints.sprint30m !== null &&
+      normalizedSprints.sprint30mSecond !== null
+    ) {
+      mappedData.fatigue_index = Number(
+        (
+          ((normalizedSprints.sprint30mSecond -
+            normalizedSprints.sprint30m) /
+            normalizedSprints.sprint30m) *
+          100
+        ).toFixed(2),
+      );
+    }
 
     if (!measurement) {
       measurement = await Measurement.create({
@@ -1266,6 +1295,31 @@ export const importXOneQr = async (req: Request, res: Response) => {
     }
     if (normalized.metrics.fatigueIndex !== null) {
       mappedMeasurementData.fatigue_index = normalized.metrics.fatigueIndex;
+    }
+
+    const normalizedSprints = normalizeSprintMeasurements(
+      mappedMeasurementData.sprint_30m,
+      mappedMeasurementData.sprint_30m_second,
+    );
+    if (normalizedSprints.sprint30m !== null) {
+      mappedMeasurementData.sprint_30m = normalizedSprints.sprint30m;
+    }
+    if (normalizedSprints.sprint30mSecond !== null) {
+      mappedMeasurementData.sprint_30m_second =
+        normalizedSprints.sprint30mSecond;
+    }
+    if (
+      normalizedSprints.sprint30m !== null &&
+      normalizedSprints.sprint30mSecond !== null
+    ) {
+      mappedMeasurementData.fatigue_index = Number(
+        (
+          ((normalizedSprints.sprint30mSecond -
+            normalizedSprints.sprint30m) /
+            normalizedSprints.sprint30m) *
+          100
+        ).toFixed(2),
+      );
     }
 
     try {
