@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   createTestSession,
+  updateTestSession,
   getAllTestSessions,
   getTestSessionById,
   getSessionStatus,
@@ -19,6 +20,7 @@ router.post("/", createTestSession);
 router.get("/", getAllTestSessions);
 router.get("/:testSessionId/field-data.xlsx", exportSessionFieldData);
 router.get("/:id", getTestSessionById);
+router.patch("/:id", updateTestSession);
 router.get("/:id/status", getSessionStatus);
 
 // Calculate performance report

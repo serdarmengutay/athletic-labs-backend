@@ -387,6 +387,138 @@ export const createTestSession = async (req: Request, res: Response) => {
 };
 
 /**
+ * PATCH /api/test-sessions/:id
+ * Update core test session details without changing athlete registrations.
+ */
+export const updateTestSession = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const {
+      clubName,
+      clubResponsibleName,
+      clubResponsibleEmail,
+      clubResponsiblePhone,
+      city,
+      sportType,
+      testDate,
+      notes,
+      valdEnabled,
+      valdConfig,
+    } = req.body ?? {};
+
+    const testSession = await TestSession.findByPk(id);
+    if (!testSession) {
+      return res.status(404).json({
+        success: false,
+        message: "Test oturumu bulunamadı",
+      });
+    }
+
+    if (clubName !== undefined) {
+      if (!String(clubName).trim()) {
+        return res.status(400).json({
+          success: false,
+          message: "Kulüp adı boş olamaz",
+        });
+      }
+      testSession.club_name = String(clubName).trim();
+    }
+
+    if (clubResponsibleName !== undefined) {
+      if (!String(clubResponsibleName).trim()) {
+        return res.status(400).json({
+          success: false,
+          message: "Sorumlu adı boş olamaz",
+        });
+      }
+      testSession.club_responsible_name = String(clubResponsibleName).trim();
+    }
+
+    if (clubResponsibleEmail !== undefined) {
+      testSession.club_responsible_email =
+        String(clubResponsibleEmail || "").trim() || null;
+    }
+
+    if (clubResponsiblePhone !== undefined) {
+      testSession.club_responsible_phone =
+        String(clubResponsiblePhone || "").trim() || null;
+    }
+
+    if (city !== undefined) {
+      if (!String(city).trim()) {
+        return res.status(400).json({
+          success: false,
+          message: "Şehir boş olamaz",
+        });
+      }
+      testSession.city = String(city).trim();
+    }
+
+    if (sportType !== undefined) {
+      if (!String(sportType).trim()) {
+        return res.status(400).json({
+          success: false,
+          message: "Spor dalı boş olamaz",
+        });
+      }
+      testSession.sport_type = String(sportType).trim();
+    }
+
+    if (testDate !== undefined) {
+      const parsedTestDate = new Date(testDate);
+      if (Number.isNaN(parsedTestDate.getTime())) {
+        return res.status(400).json({
+          success: false,
+          message: "Geçerli bir test tarihi giriniz",
+        });
+      }
+      testSession.test_date = parsedTestDate;
+    }
+
+    if (notes !== undefined) {
+      testSession.notes = String(notes || "").trim() || null;
+    }
+
+    if (valdEnabled !== undefined) {
+      testSession.vald_enabled = Boolean(valdEnabled);
+    }
+
+    if (valdConfig !== undefined) {
+      testSession.vald_config = normalizeValdConfig(valdConfig);
+    }
+
+    await testSession.save();
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        id: testSession.id,
+        clubName: testSession.club_name,
+        clubResponsibleName: testSession.club_responsible_name,
+        clubResponsibleEmail: testSession.club_responsible_email,
+        clubResponsiblePhone: testSession.club_responsible_phone,
+        city: testSession.city,
+        sportType: testSession.sport_type,
+        valdEnabled: testSession.vald_enabled,
+        valdConfig: testSession.vald_config,
+        testDate: testSession.test_date,
+        status: testSession.status,
+        notes: testSession.notes,
+        createdAt: testSession.created_at,
+      },
+      message: "Test oturumu güncellendi",
+    });
+  } catch (error) {
+    console.error("updateTestSession error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Test oturumu güncellenirken hata oluştu",
+      error: error instanceof Error ? error.message : "Bilinmeyen hata",
+    });
+  }
+};
+
+/**
  * POST /api/test-sessions/:testSessionId/athletes
  * Bulk import athletes into a test session
  */

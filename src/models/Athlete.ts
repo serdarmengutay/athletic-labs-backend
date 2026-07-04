@@ -9,6 +9,7 @@ interface AthleteAttributes {
   birth_date: Date | null;
   birth_year: number;
   gender: AthleteGender;
+  parent_phone: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -16,7 +17,7 @@ interface AthleteAttributes {
 interface AthleteCreationAttributes
   extends Optional<
     AthleteAttributes,
-    "id" | "birth_date" | "gender" | "created_at" | "updated_at"
+    "id" | "birth_date" | "gender" | "parent_phone" | "created_at" | "updated_at"
   > {}
 
 class Athlete
@@ -28,6 +29,7 @@ class Athlete
   public birth_date!: Date | null;
   public birth_year!: number;
   public gender!: AthleteGender;
+  public parent_phone!: string | null;
   public readonly created_at!: Date;
   public readonly updated_at!: Date;
 }
@@ -58,6 +60,10 @@ Athlete.init(
       validate: {
         isIn: [[ATHLETE_GENDERS.MALE, ATHLETE_GENDERS.FEMALE]],
       },
+    },
+    parent_phone: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
     },
     created_at: {
       type: DataTypes.DATE,

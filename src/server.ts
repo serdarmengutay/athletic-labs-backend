@@ -29,13 +29,28 @@ import authRoutes from "./routes/auth";
 import excelRoutes from "./routes/excel";
 import coachRoutes from "./routes/coaches";
 import youjiuPushRoutes from "./routes/youjiuPush";
+import publicRegistrationRoutes from "./routes/publicRegistrations";
 
 const app = express();
 const PORT = process.env.PORT || 5017;
+app.set("trust proxy", 1);
+const productionDefaultOrigins =
+  process.env.NODE_ENV === "production"
+    ? [
+        "https://panel.athleticlabs.com.tr",
+        "https://www.athleticlabs.com.tr",
+        "https://kayit.athleticlabs.com.tr",
+      ]
+    : [];
 const allowedOrigins = (process.env.CORS_ORIGIN || "")
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);
+productionDefaultOrigins.forEach((origin) => {
+  if (!allowedOrigins.includes(origin)) {
+    allowedOrigins.push(origin);
+  }
+});
 
 // Middleware
 app.use(helmet());
@@ -88,6 +103,9 @@ app.get("/api", (req: Request, res: Response) => {
 
 // Youjiu calls this endpoint from its own servers, so it must stay public.
 app.use("/api/youjiu/push", youjiuPushRoutes);
+
+// Public pre-test registration links for parents/athletes.
+app.use("/api/public", publicRegistrationRoutes);
 
 // Apply Firebase auth middleware to all /api/* routes
 // TODO: Add role/permission checks here when needed
