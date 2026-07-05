@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   createTestSession,
   updateTestSession,
+  deleteTestSession,
   getAllTestSessions,
   getTestSessionById,
   getSessionStatus,
@@ -21,6 +22,7 @@ router.get("/", getAllTestSessions);
 router.get("/:testSessionId/field-data.xlsx", exportSessionFieldData);
 router.get("/:id", getTestSessionById);
 router.patch("/:id", updateTestSession);
+router.delete("/:id", deleteTestSession);
 router.get("/:id/status", getSessionStatus);
 
 // Calculate performance report

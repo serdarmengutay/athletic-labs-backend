@@ -6,6 +6,7 @@ import {
   AthleteTest,
   Measurement,
   XOneReportImport,
+  ValdResultImport,
   sequelize,
 } from "../models";
 import { Op, UniqueConstraintError } from "sequelize";
@@ -69,6 +70,7 @@ const DEFAULT_VALD_CONFIG = {
   disabledManualFields: [],
   expectedMetrics: [],
 };
+const TEST_SESSION_DELETE_PASSWORD = "080826";
 
 function normalizeValdConfig(value: unknown): Record<string, any> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -513,6 +515,86 @@ export const updateTestSession = async (req: Request, res: Response) => {
     return res.status(500).json({
       success: false,
       message: "Test oturumu güncellenirken hata oluştu",
+      error: error instanceof Error ? error.message : "Bilinmeyen hata",
+    });
+  }
+};
+
+export const deleteTestSession = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const deletePassword = String(req.body?.deletePassword || "");
+
+    if (deletePassword !== TEST_SESSION_DELETE_PASSWORD) {
+      return res.status(403).json({
+        success: false,
+        message: "Silme şifresi hatalı.",
+        code: "INVALID_DELETE_PASSWORD",
+      });
+    }
+
+    const result = await sequelize.transaction(async (transaction) => {
+      const testSession = await TestSession.findByPk(id, { transaction });
+      if (!testSession) return null;
+
+      const athleteTests = await AthleteTest.findAll({
+        where: { test_session_id: id },
+        attributes: ["id"],
+        transaction,
+      });
+      const athleteTestIds = athleteTests.map((athleteTest) => athleteTest.id);
+
+      await ValdResultImport.destroy({
+        where: { test_session_id: id },
+        transaction,
+      });
+
+      await XOneReportImport.destroy({
+        where: { test_session_id: id },
+        transaction,
+      });
+
+      if (athleteTestIds.length > 0) {
+        await Measurement.destroy({
+          where: {
+            athlete_test_id: {
+              [Op.in]: athleteTestIds,
+            },
+          },
+          transaction,
+        });
+      }
+
+      await AthleteTest.destroy({
+        where: { test_session_id: id },
+        transaction,
+      });
+
+      await testSession.destroy({ transaction });
+
+      return {
+        deletedAthleteTests: athleteTestIds.length,
+      };
+    });
+
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        message: "Test oturumu bulunamadı.",
+        code: "TEST_SESSION_NOT_FOUND",
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: "Test oturumu silindi.",
+      data: result,
+    });
+  } catch (error) {
+    console.error("deleteTestSession error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Test oturumu silinirken hata oluştu.",
       error: error instanceof Error ? error.message : "Bilinmeyen hata",
     });
   }
