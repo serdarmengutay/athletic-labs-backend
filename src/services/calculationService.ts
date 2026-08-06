@@ -23,6 +23,7 @@ import {
   getFallbackAverage,
 } from "../config/fallbackBenchmarks";
 import { normalizeSprintMeasurements } from "../utils/sprintMeasurements";
+import { getEnabledMeasurementFields } from "../config/sessionMeasurementFields";
 
 // Metric configuration: which direction is "better"
 const METRIC_CONFIG: Record<string, { lowerIsBetter: boolean; label: string }> =
@@ -970,23 +971,34 @@ export async function generateFrontendAthleteReport(
     };
   }
 
-  // Calculate derived metrics
-  const derived = calculateDerivedMetrics(measurement);
-
   // Build full measurement object for percentile calculation
   const normalizedSprints = normalizeSprintMeasurements(
     measurement.sprint_30m,
     measurement.sprint_30m_second,
   );
+  const height =
+    measurement.height !== null && measurement.height !== undefined
+      ? Number(measurement.height)
+      : null;
+  const weight =
+    measurement.weight !== null && measurement.weight !== undefined
+      ? Number(measurement.weight)
+      : null;
+  const derivedBmi =
+    height !== null && weight !== null ? calculateBMI(height, weight) : null;
+  const derivedFatigue =
+    normalizedSprints.sprint30m !== null &&
+    normalizedSprints.sprint30mSecond !== null
+      ? calculateFatigueIndex(
+          normalizedSprints.sprint30m,
+          normalizedSprints.sprint30mSecond,
+        )
+      : null;
   const fullMeasurement = {
     height:
-      measurement.height !== null && measurement.height !== undefined
-        ? Number(measurement.height)
-        : null,
+      height,
     weight:
-      measurement.weight !== null && measurement.weight !== undefined
-        ? Number(measurement.weight)
-        : null,
+      weight,
     sprint_30m: normalizedSprints.sprint30m,
     sprint_30m_second: normalizedSprints.sprint30mSecond,
     agility:
@@ -1005,8 +1017,8 @@ export async function generateFrontendAthleteReport(
       measurement.pass_count !== null && measurement.pass_count !== undefined
         ? Number(measurement.pass_count)
         : null,
-    bmi: derived.bmi,
-    fatigue_index: derived.fatigueIndex,
+    bmi: derivedBmi,
+    fatigue_index: derivedFatigue,
   };
   const repository = createAgeGroupMetricRepository(athleteTest.id);
   const comparison = await calculateAgeGroupMetricComparisons({
@@ -1148,28 +1160,44 @@ export async function generateFrontendAthleteReport(
           ? Math.ceil(fullMeasurement.pass_count * 1.12)
           : null,
     },
-    bmi: buildMetric(derived.bmi, "bmi"),
-    fatigueIndex: buildMetric(derived.fatigueIndex, "fatigue_index"),
+    bmi: buildMetric(derivedBmi, "bmi"),
+    fatigueIndex: buildMetric(derivedFatigue, "fatigue_index"),
   };
 
   const heightMetric = buildMetric(fullMeasurement.height, "height");
   const weightMetric = buildMetric(fullMeasurement.weight, "weight");
-  const valdEnabled = Boolean(athleteTest.testSession?.vald_enabled);
+  const enabledMeasurementFields = new Set(
+    getEnabledMeasurementFields(
+      athleteTest.testSession?.sport_type,
+      athleteTest.testSession?.vald_config,
+      Boolean(athleteTest.testSession?.vald_enabled),
+    ),
+  );
   const overallPerformance = calculateWeightedTopPercentile([
-    { percentile: heightMetric.percentile, weight: REPORT_METRIC_CONFIG.height.weight },
-    { percentile: weightMetric.percentile, weight: REPORT_METRIC_CONFIG.weight.weight },
-    { percentile: metrics.sprint1.percentile, weight: REPORT_METRIC_CONFIG.sprint_30m.weight },
-    {
+    ...(enabledMeasurementFields.has("height")
+      ? [{ percentile: heightMetric.percentile, weight: REPORT_METRIC_CONFIG.height.weight }]
+      : []),
+    ...(enabledMeasurementFields.has("weight")
+      ? [{ percentile: weightMetric.percentile, weight: REPORT_METRIC_CONFIG.weight.weight }]
+      : []),
+    ...(enabledMeasurementFields.has("sprint30m")
+      ? [{ percentile: metrics.sprint1.percentile, weight: REPORT_METRIC_CONFIG.sprint_30m.weight }]
+      : []),
+    ...(enabledMeasurementFields.has("sprint30mSecond") ? [{
       percentile: metrics.sprint2.percentile,
       weight: REPORT_METRIC_CONFIG.sprint_30m_second.weight,
-    },
-    { percentile: metrics.agility.percentile, weight: REPORT_METRIC_CONFIG.agility.weight },
-    {
+    }] : []),
+    ...(enabledMeasurementFields.has("agility")
+      ? [{ percentile: metrics.agility.percentile, weight: REPORT_METRIC_CONFIG.agility.weight }]
+      : []),
+    ...(enabledMeasurementFields.has("flexibility") ? [{
       percentile: metrics.flexibility.percentile,
       weight: REPORT_METRIC_CONFIG.flexibility.weight,
-    },
-    { percentile: metrics.passCount.percentile, weight: REPORT_METRIC_CONFIG.pass_count.weight },
-    ...(!valdEnabled
+    }] : []),
+    ...(enabledMeasurementFields.has("passCount")
+      ? [{ percentile: metrics.passCount.percentile, weight: REPORT_METRIC_CONFIG.pass_count.weight }]
+      : []),
+    ...(enabledMeasurementFields.has("verticalJump")
       ? [
           {
             percentile: metrics.verticalJump.percentile,
@@ -1192,7 +1220,7 @@ export async function generateFrontendAthleteReport(
         measurement.weight !== null && measurement.weight !== undefined
           ? Number(measurement.weight)
           : undefined,
-      bmi: derived.bmi ?? undefined,
+      bmi: derivedBmi ?? undefined,
       ffmi:
         measurement.ffmi !== null && measurement.ffmi !== undefined
           ? Number(measurement.ffmi)

@@ -22,6 +22,12 @@ import {
 import { normalizeSprintMeasurements } from "../utils/sprintMeasurements";
 import { normalizeXOnePayload } from "../services/xOneImportService";
 import { parseYoujiuQrUrl, YoujiuApiClient } from "../services/youjiuClient";
+import {
+  getEnabledMeasurementFields,
+  MEASUREMENT_DATABASE_FIELDS,
+  MEASUREMENT_KEYS,
+  MeasurementKey,
+} from "../config/sessionMeasurementFields";
 
 // Required measurement fields for marking test as complete
 const REQUIRED_MEASUREMENT_FIELDS = [
@@ -34,32 +40,84 @@ const REQUIRED_MEASUREMENT_FIELDS = [
   "pass_count",
 ];
 
-function requiredMeasurementFields(valdEnabled: boolean): string[] {
-  return valdEnabled
-    ? REQUIRED_MEASUREMENT_FIELDS.filter((field) => field !== "vertical_jump")
-    : REQUIRED_MEASUREMENT_FIELDS;
+function requiredMeasurementFields(testSession: TestSession): string[] {
+  const enabledDatabaseFields = new Set(
+    getEnabledMeasurementFields(
+      testSession.sport_type,
+      testSession.vald_config,
+      testSession.vald_enabled,
+    ).map((key) => MEASUREMENT_DATABASE_FIELDS[key]),
+  );
+  return REQUIRED_MEASUREMENT_FIELDS.filter((field) =>
+    enabledDatabaseFields.has(field),
+  );
 }
 
-function applyTemporaryValdReportRules(
+function applySessionReportRules(
   report: FrontendAthleteReport,
-  valdEnabled: boolean,
+  testSession: TestSession,
 ): FrontendAthleteReport {
-  if (!valdEnabled) return report;
-
-  report.metrics.verticalJump = {
-    value: null,
-    score: null,
-    percentile: null,
-    target: null,
+  const enabledFields = new Set(
+    getEnabledMeasurementFields(
+      testSession.sport_type,
+      testSession.vald_config,
+      testSession.vald_enabled,
+    ),
+  );
+  const metricMap: Partial<
+    Record<MeasurementKey, keyof FrontendAthleteReport["metrics"]>
+  > = {
+    flexibility: "flexibility",
+    sprint30m: "sprint1",
+    sprint30mSecond: "sprint2",
+    agility: "agility",
+    verticalJump: "verticalJump",
+    passCount: "passCount",
   };
-  if (report.measurements) {
-    delete report.measurements.verticalJump;
+  const averageMap: Partial<
+    Record<MeasurementKey, keyof FrontendAthleteReport["ageGroupAverages"]>
+  > = {
+    flexibility: "flexibility",
+    sprint30m: "sprint1",
+    sprint30mSecond: "sprint2",
+    agility: "agility",
+    verticalJump: "verticalJump",
+    passCount: "passCount",
+  };
+
+  for (const key of MEASUREMENT_KEYS) {
+    if (enabledFields.has(key)) continue;
+    if (report.measurements) delete report.measurements[key];
+    const metricKey = metricMap[key];
+    if (metricKey) {
+      report.metrics[metricKey] = {
+        value: null,
+        score: null,
+        percentile: null,
+        target: null,
+      };
+    }
+    const averageKey = averageMap[key];
+    if (averageKey) {
+      report.ageGroupAverages[averageKey] = null;
+      report.ageGroupPercentiles[averageKey] = null;
+    }
   }
-  if (report.ageGroupAverages) {
-    report.ageGroupAverages.verticalJump = null;
+
+  // Türetilen metrikler yalnızca kaynak alanların ikisi de açıksa geçerlidir.
+  if (!enabledFields.has("height") || !enabledFields.has("weight")) {
+    if (report.measurements) delete report.measurements.bmi;
+    report.metrics.bmi = { value: null, score: null, percentile: null, target: null };
+    report.ageGroupAverages.bmi = null;
+    report.ageGroupPercentiles.bmi = null;
   }
-  if (report.ageGroupPercentiles) {
-    report.ageGroupPercentiles.verticalJump = null;
+  if (!enabledFields.has("sprint30m") || !enabledFields.has("sprint30mSecond")) {
+    report.metrics.fatigueIndex = {
+      value: null,
+      score: null,
+      percentile: null,
+      target: null,
+    };
   }
 
   return report;
@@ -88,6 +146,15 @@ function normalizeValdConfig(value: unknown): Record<string, any> {
     expectedMetrics: Array.isArray(config.expectedMetrics)
       ? config.expectedMetrics
       : [],
+    ...(Array.isArray(config.enabledMeasurementFields)
+      ? {
+          enabledMeasurementFields: config.enabledMeasurementFields.filter(
+            (key): key is MeasurementKey =>
+              typeof key === "string" &&
+              MEASUREMENT_KEYS.includes(key as MeasurementKey),
+          ),
+        }
+      : {}),
   };
 }
 
@@ -221,9 +288,9 @@ export const calculateReport = async (req: Request, res: Response) => {
 
       try {
         // generateFrontendAthleteReport handles missing measurements and benchmark data gracefully
-        const report = applyTemporaryValdReportRules(
+        const report = applySessionReportRules(
           await generateFrontendAthleteReport(athleteTest, measurement),
-          testSession.vald_enabled,
+          testSession,
         );
         const youjiSummary = buildYoujiSummary(
           latestXOneImportByAthleteTestId.get(athleteTest.id),
@@ -301,6 +368,11 @@ export const calculateReport = async (req: Request, res: Response) => {
       testSessionId: id,
       clubName: testSession.club_name,
       valdEnabled: testSession.vald_enabled,
+      enabledMeasurementFields: getEnabledMeasurementFields(
+        testSession.sport_type,
+        testSession.vald_config,
+        testSession.vald_enabled,
+      ),
       testDate: testSession.test_date,
       reportGeneratedAt: new Date().toISOString(),
       athletes,
@@ -1151,7 +1223,7 @@ export const saveMeasurements = async (req: Request, res: Response) => {
 
     // Check if all required fields are filled
     const isComplete = requiredMeasurementFields(
-      Boolean((athleteTest as any).testSession?.vald_enabled),
+      (athleteTest as any).testSession,
     ).every(
       (field) => measurement![field as keyof typeof measurement] !== null,
     );
@@ -1562,7 +1634,7 @@ export const importXOneQr = async (req: Request, res: Response) => {
         }
 
         const isComplete = measurement
-          ? requiredMeasurementFields(testSession.vald_enabled).every(
+          ? requiredMeasurementFields(testSession).every(
               (field) =>
                 measurement![field as keyof Measurement] !== null &&
                 measurement![field as keyof Measurement] !== undefined,

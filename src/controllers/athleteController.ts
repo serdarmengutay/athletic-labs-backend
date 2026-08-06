@@ -97,9 +97,47 @@ export const updateAthlete = async (req: Request, res: Response) => {
       });
     }
 
-    if (full_name) athlete.full_name = full_name;
-    if (birth_year) athlete.birth_year = birth_year;
-    if (birth_date) athlete.birth_date = new Date(birth_date);
+    if (full_name !== undefined) {
+      const normalizedName = String(full_name).trim().replace(/\s+/g, " ");
+      if (!normalizedName) {
+        return res.status(400).json({
+          success: false,
+          message: "Sporcu adı boş olamaz",
+        });
+      }
+      athlete.full_name = normalizedName;
+    }
+
+    let normalizedBirthYear: number | undefined;
+    if (birth_year !== undefined) {
+      normalizedBirthYear = Number(birth_year);
+      const currentYear = new Date().getFullYear();
+      if (
+        !Number.isInteger(normalizedBirthYear) ||
+        normalizedBirthYear < 1900 ||
+        normalizedBirthYear > currentYear
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Geçerli bir doğum yılı giriniz",
+        });
+      }
+    }
+
+    if (birth_date !== undefined) {
+      const parsedBirthDate = new Date(String(birth_date));
+      if (Number.isNaN(parsedBirthDate.getTime())) {
+        return res.status(400).json({
+          success: false,
+          message: "Geçerli bir doğum tarihi giriniz",
+        });
+      }
+      // Tarih gönderildiğinde yıl bu tarihten türetilerek iki alan tutarlı tutulur.
+      athlete.birth_date = parsedBirthDate;
+      athlete.birth_year = parsedBirthDate.getUTCFullYear();
+    } else if (normalizedBirthYear !== undefined) {
+      athlete.birth_year = normalizedBirthYear;
+    }
     if (gender !== undefined) athlete.gender = normalizeGender(gender);
 
     await athlete.save();
