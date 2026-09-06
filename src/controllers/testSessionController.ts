@@ -198,6 +198,17 @@ function safeFileName(value: string): string {
     .slice(0, 80);
 }
 
+async function findAthleteFullName(athleteId: string): Promise<string | null> {
+  try {
+    const athlete = await Athlete.findByPk(athleteId, {
+      attributes: ["full_name"],
+    });
+    return athlete?.full_name ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function buildYoujiSummary(
   xOneImport?: XOneReportImport | null,
 ): FrontendAthleteReport["youjiSummary"] | undefined {
@@ -265,7 +276,11 @@ export const calculateReport = async (req: Request, res: Response) => {
       where: {
         athlete_test_id: athleteTests.map((athleteTest) => athleteTest.id),
       },
-      order: [["created_at", "DESC"]],
+      // Taşınan (yeniden atanan) kayıt en güncel bağlantı sayılmalı.
+      order: [
+        ["updated_at", "DESC"],
+        ["created_at", "DESC"],
+      ],
     });
     const latestXOneImportByAthleteTestId = new Map<string, XOneReportImport>();
     for (const xOneImport of xOneImports) {
@@ -1096,7 +1111,11 @@ export const getMeasurements = async (req: Request, res: Response) => {
     const measurement = (athleteTest as any).measurement as Measurement | null;
     const xOneImport = await XOneReportImport.findOne({
       where: { athlete_test_id: athleteTestId },
-      order: [["created_at", "DESC"]],
+      // Taşınan (yeniden atanan) kayıt en güncel bağlantı sayılmalı.
+      order: [
+        ["updated_at", "DESC"],
+        ["created_at", "DESC"],
+      ],
     });
 
     return res.status(200).json({
@@ -1123,6 +1142,7 @@ export const getMeasurements = async (req: Request, res: Response) => {
           : {},
         xOneQrImported: Boolean(xOneImport),
         xOneReportId: xOneImport?.report_id ?? null,
+        xOneQrUrl: xOneImport?.qr_url ?? null,
         xOneImportedAt: xOneImport?.created_at?.toISOString() ?? null,
       },
     });
@@ -1327,6 +1347,8 @@ export const importXOneQr = async (req: Request, res: Response) => {
   try {
     const { testSessionId } = req.params;
     const { athleteId, qrUrl } = req.body ?? {};
+    // Yanlış sporcuya okutulan bir Youji raporunu doğru sporcuya taşımak için.
+    const reassign = req.body?.reassign === true;
 
     if (!athleteId || typeof athleteId !== "string") {
       return res.status(400).json({
@@ -1388,6 +1410,7 @@ export const importXOneQr = async (req: Request, res: Response) => {
 
     if (
       existingImport &&
+      !reassign &&
       !(
         existingImport.test_session_id === testSessionId &&
         existingImport.athlete_id === athleteId
@@ -1400,7 +1423,10 @@ export const importXOneQr = async (req: Request, res: Response) => {
         data: {
           reportId: existingImport.report_id,
           athleteId: existingImport.athlete_id,
+          athleteFullName: await findAthleteFullName(existingImport.athlete_id),
           testSessionId: existingImport.test_session_id,
+          sameTestSession: existingImport.test_session_id === testSessionId,
+          canReassign: true,
         },
       });
     }
@@ -1515,17 +1541,38 @@ export const importXOneQr = async (req: Request, res: Response) => {
         });
       }
 
-      return res.status(409).json({
-        success: false,
-        message: "Bu QR kodu başka bir sporcuya atanmış",
-        code: "DUPLICATE_REPORT_ID",
-        data: {
-          reportId: duplicateAfterResolve.report_id,
-          athleteId: duplicateAfterResolve.athlete_id,
-          testSessionId: duplicateAfterResolve.test_session_id,
-        },
-      });
+      if (!reassign) {
+        return res.status(409).json({
+          success: false,
+          message: "Bu QR kodu başka bir sporcuya atanmış",
+          code: "DUPLICATE_REPORT_ID",
+          data: {
+            reportId: duplicateAfterResolve.report_id,
+            athleteId: duplicateAfterResolve.athlete_id,
+            athleteFullName: await findAthleteFullName(
+              duplicateAfterResolve.athlete_id,
+            ),
+            testSessionId: duplicateAfterResolve.test_session_id,
+            sameTestSession:
+              duplicateAfterResolve.test_session_id === testSessionId,
+            canReassign: true,
+          },
+        });
+      }
     }
+
+    // Kayıt taşınmadan önce eski sahibini not al; taşındıktan sonra okunamıyor.
+    const reassignedFrom =
+      duplicateAfterResolve &&
+      (duplicateAfterResolve.athlete_id !== athleteId ||
+        duplicateAfterResolve.test_session_id !== testSessionId)
+        ? {
+            athleteId: duplicateAfterResolve.athlete_id,
+            athleteTestId: duplicateAfterResolve.athlete_test_id,
+            testSessionId: duplicateAfterResolve.test_session_id,
+            fullName: await findAthleteFullName(duplicateAfterResolve.athlete_id),
+          }
+        : null;
 
     const mappedMeasurementData: Record<string, number> = {};
     const measurementTime = parseDateOrNull(
@@ -1593,28 +1640,31 @@ export const importXOneQr = async (req: Request, res: Response) => {
 
     try {
       const result = await sequelize.transaction(async (transaction) => {
-        const importedReport = await XOneReportImport.create(
-          {
-            test_session_id: testSessionId,
-            athlete_id: athleteId,
-            athlete_test_id: athleteTest.id,
-            report_id: String(resolvedReportId),
-            agent_id: parsedQr.agentId,
-            qr_token: parsedQr.token,
-            qr_url: parsedQr.qrUrl,
-            raw_payload: rawPayload,
-            composition: normalized.sections.composition,
-            measurement: normalized.sections.measurement,
-            posture: normalized.sections.posture,
-            balance: normalized.sections.balance,
-            measurement_time: measurementTime,
-            body_fat_percent: normalized.youjiSummary.bodyFatPercent,
-            mineral_amount: normalized.youjiSummary.mineralAmount,
-            protein_amount: normalized.youjiSummary.proteinAmount,
-            device_serial: normalized.youjiSummary.deviceSerial,
-          },
-          { transaction },
-        );
+        const importPayload = {
+          test_session_id: testSessionId,
+          athlete_id: athleteId,
+          athlete_test_id: athleteTest.id,
+          report_id: String(resolvedReportId),
+          agent_id: parsedQr.agentId,
+          qr_token: parsedQr.token,
+          qr_url: parsedQr.qrUrl,
+          raw_payload: rawPayload,
+          composition: normalized.sections.composition,
+          measurement: normalized.sections.measurement,
+          posture: normalized.sections.posture,
+          balance: normalized.sections.balance,
+          measurement_time: measurementTime,
+          body_fat_percent: normalized.youjiSummary.bodyFatPercent,
+          mineral_amount: normalized.youjiSummary.mineralAmount,
+          protein_amount: normalized.youjiSummary.proteinAmount,
+          device_serial: normalized.youjiSummary.deviceSerial,
+        };
+
+        // report_id benzersiz olduğu için yanlış sporcuya bağlı kayıt
+        // yeniden oluşturulamaz; mevcut kaydı doğru sporcuya taşıyoruz.
+        const importedReport = duplicateAfterResolve
+          ? await duplicateAfterResolve.update(importPayload, { transaction })
+          : await XOneReportImport.create(importPayload, { transaction });
 
         let measurement = (athleteTest as any).measurement as Measurement | null;
         if (!measurement) {
@@ -1661,10 +1711,14 @@ export const importXOneQr = async (req: Request, res: Response) => {
 
       return res.status(201).json({
         success: true,
-        message: "Youjiu QR raporu başarıyla içe aktarıldı",
+        message: reassignedFrom
+          ? "Youjiu QR raporu bu sporcuya taşındı"
+          : "Youjiu QR raporu başarıyla içe aktarıldı",
+        code: reassignedFrom ? "X_ONE_IMPORT_REASSIGNED" : undefined,
         data: {
           testSessionId,
           athleteId,
+          reassignedFrom,
           athleteTestId: athleteTest.id,
           reportId: String(resolvedReportId),
           agentId: parsedQr.agentId,
