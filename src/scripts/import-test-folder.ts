@@ -1,133 +1,101 @@
+import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { QueryTypes, Transaction } from "sequelize";
 import * as XLSX from "xlsx";
 import sequelize from "../config/database";
-import { ATHLETE_GENDERS, normalizeGender } from "../config/gender";
-import { HistoricalAthleteData } from "../models";
+import { normalizeGender } from "../config/gender";
 import {
-  buildDuplicateCandidateHash,
-  extractClubNameFromFilePath,
   isLikelyHistoricalTestSheet,
   mapExcelRow,
   ParsedHistoricalRow,
   shouldSkipImportFile,
 } from "../utils/historicalImport";
+import {
+  athleteNameKey,
+  computeMembershipEndDates,
+  FolderMappingEntry,
+  normalizeAthleteName,
+  relativeToRoot,
+  resolveFolderMapping,
+  ResolvedFolderMapping,
+  validateFolderMapping,
+} from "../utils/testFolderImport";
 
-const TEST_FOLDER = "/Users/setfree/Documents/TEST";
-const OUTPUT_DIR = path.resolve(
-  "/Users/setfree/Documents/projects/athletic-labs-backend/outputs/test-folder-import",
-);
-const DRY_RUN = process.argv.includes("--dry-run");
-const TRUNCATE_FIRST = process.argv.includes("--truncate");
+// Usage:
+//   npm run import-test-folder -- --folder "<TEST klasörü>" --mapping mapping.json          (dry run)
+//   npm run import-test-folder -- --folder "<TEST klasörü>" --mapping mapping.json --apply  (writes)
+//
+// Schema is managed only by migrations; this script never alters or truncates tables.
+// Clubs must already exist in `clubs`. Possible duplicate identities across clubs are
+// written to identity_merge_candidates and never merged automatically.
 
-interface DuplicateCandidateEntry {
-  filePath: string;
-  sheetName: string;
-  rowNumber: number;
-  athleteName?: string;
-  birthYear?: number;
-  hash: string;
+const OUTPUT_DIR = path.resolve(__dirname, "../../outputs/test-folder-import");
+
+// Compares names the way normalizeAthleteName does: NFC, collapsed whitespace, upper case.
+const nameSql = (column: string) =>
+  `upper(btrim(regexp_replace(normalize(${column}, NFC), '\\s+', ' ', 'g')))`;
+
+interface CliOptions {
+  folder: string;
+  mappingPath: string;
+  apply: boolean;
 }
 
 interface ImportReport {
+  mode: "dry-run" | "apply";
   scannedFiles: number;
   importedFiles: number;
+  unmappedFiles: string[];
+  unknownClubs: string[];
   skippedFiles: string[];
   importedRows: number;
-  duplicateCandidateRows: number;
-  invalidRows: Array<{
-    filePath: string;
-    sheetName: string;
-    rowNumber: number;
-    reason: string;
-  }>;
-  duplicateCandidates: DuplicateCandidateEntry[];
+  alreadyImportedRows: number;
+  linkedExistingAthletes: number;
+  createdAthletes: number;
+  createdTeams: string[];
+  mergeCandidates: number;
+  ambiguousRows: Array<{ filePath: string; rowNumber: number; reason: string }>;
+  invalidRows: Array<{ filePath: string; sheetName: string; rowNumber: number; reason: string }>;
 }
 
-async function ensureHistoricalTableColumns() {
-  await sequelize.query(`
-    ALTER TABLE historical_athlete_data
-    ADD COLUMN IF NOT EXISTS full_name VARCHAR(150)
-  `);
-  await sequelize.query(`
-    ALTER TABLE historical_athlete_data
-    ADD COLUMN IF NOT EXISTS club_name VARCHAR(150)
-  `);
-  await sequelize.query(`
-    ALTER TABLE historical_athlete_data
-    ADD COLUMN IF NOT EXISTS country_code VARCHAR(4)
-  `);
-  await sequelize.query(`
-    ALTER TABLE historical_athlete_data
-    ADD COLUMN IF NOT EXISTS country_name VARCHAR(100)
-  `);
-  await sequelize.query(`
-    ALTER TABLE historical_athlete_data
-    ADD COLUMN IF NOT EXISTS gender VARCHAR(10)
-  `);
-  await sequelize.query(`
-    ALTER TABLE historical_athlete_data
-    ADD COLUMN IF NOT EXISTS pass_count INTEGER
-  `);
-  await sequelize.query(`
-    ALTER TABLE historical_athlete_data
-    ADD COLUMN IF NOT EXISTS fatigue_index NUMERIC(5, 2)
-  `);
-  await sequelize.query(`
-    UPDATE historical_athlete_data
-    SET gender = '${ATHLETE_GENDERS.MALE}'
-    WHERE gender IS NULL OR TRIM(gender) = ''
-  `);
-  await sequelize.query(`
-    ALTER TABLE historical_athlete_data
-    ALTER COLUMN gender SET DEFAULT '${ATHLETE_GENDERS.MALE}'
-  `);
-  await sequelize.query(`
-    UPDATE historical_athlete_data
-    SET country_code = 'TR',
-        country_name = 'Türkiye'
-    WHERE country_code IS NULL
-       OR TRIM(country_code) = ''
-       OR country_name IS NULL
-       OR TRIM(country_name) = ''
-  `);
-  await sequelize.query(`
-    ALTER TABLE historical_athlete_data
-    ALTER COLUMN country_code SET DEFAULT 'TR'
-  `);
-  await sequelize.query(`
-    ALTER TABLE historical_athlete_data
-    ALTER COLUMN country_name SET DEFAULT 'Türkiye'
-  `);
-  await sequelize.query(`
-    CREATE INDEX IF NOT EXISTS historical_athlete_data_birth_year_gender_idx
-    ON historical_athlete_data (birth_year, gender)
-  `);
+function parseArgs(argv: string[]): CliOptions {
+  if (argv.includes("--truncate")) {
+    throw new Error("--truncate kaldırıldı: bu script mevcut veriyi silmez.");
+  }
+
+  const valueOf = (flag: string) => {
+    const index = argv.indexOf(flag);
+    return index >= 0 ? argv[index + 1] : undefined;
+  };
+  const folder = valueOf("--folder");
+  const mappingPath = valueOf("--mapping");
+
+  if (!folder || !mappingPath) {
+    throw new Error('Kullanım: --folder "<klasör>" --mapping <eşleme.json> [--apply]');
+  }
+
+  return { folder: path.resolve(folder), mappingPath: path.resolve(mappingPath), apply: argv.includes("--apply") };
 }
 
-async function walkFiles(rootDir: string): Promise<string[]> {
-  const discovered: string[] = [];
+async function walkExcelFiles(rootDir: string): Promise<string[]> {
   const entries = await fs.readdir(rootDir, { withFileTypes: true });
+  const files: string[] = [];
 
   for (const entry of entries) {
     const absolutePath = path.join(rootDir, entry.name);
-
     if (entry.isDirectory()) {
-      discovered.push(...(await walkFiles(absolutePath)));
-      continue;
+      files.push(...(await walkExcelFiles(absolutePath)));
+    } else if (entry.isFile() && /\.(xlsx|xls|csv)$/i.test(entry.name)) {
+      files.push(absolutePath);
     }
-
-    if (!entry.isFile()) continue;
-    if (!/\.(xlsx|xls|csv)$/i.test(entry.name)) continue;
-
-    discovered.push(absolutePath);
   }
 
-  return discovered;
+  return files;
 }
 
-function isImportableRow(row: ParsedHistoricalRow): boolean {
-  const metricCount = [
+function metricCount(row: ParsedHistoricalRow): number {
+  return [
     row.height,
     row.weight,
     row.flexibility,
@@ -138,157 +106,360 @@ function isImportableRow(row: ParsedHistoricalRow): boolean {
     row.passCount,
     row.ffmi,
   ].filter((value) => value !== undefined).length;
+}
 
-  return Boolean(row.athleteName && row.birthYear && metricCount >= 1);
+async function findClubId(name: string): Promise<string | null> {
+  const [club] = await sequelize.query<{ id: string }>(
+    "SELECT id FROM clubs WHERE normalize(name, NFC) = normalize(:name, NFC)",
+    { replacements: { name }, type: QueryTypes.SELECT },
+  );
+  return club?.id ?? null;
+}
+
+async function findOrCreateTeam(
+  clubId: string,
+  teamName: string,
+  report: ImportReport,
+  transaction: Transaction,
+): Promise<string> {
+  const [team] = await sequelize.query<{ id: string }>(
+    "SELECT id FROM teams WHERE club_id = :clubId AND normalize(name, NFC) = normalize(:teamName, NFC)",
+    { replacements: { clubId, teamName }, type: QueryTypes.SELECT, transaction },
+  );
+  if (team) return team.id;
+
+  const id = randomUUID();
+  await sequelize.query(
+    "INSERT INTO teams (id, club_id, name, created_at, updated_at) VALUES (:id, :clubId, :teamName, now(), now())",
+    { replacements: { id, clubId, teamName }, transaction },
+  );
+  report.createdTeams.push(teamName);
+  return id;
+}
+
+interface AthleteCandidate {
+  id: string;
+  in_club: boolean;
+}
+
+// Same name + birth year inside the same club is treated as the same athlete.
+async function findAthleteCandidates(
+  name: string,
+  birthYear: number,
+  clubId: string,
+  transaction: Transaction,
+): Promise<AthleteCandidate[]> {
+  return sequelize.query<AthleteCandidate>(
+    `
+      SELECT a.id,
+        EXISTS (
+          SELECT 1 FROM athlete_team_memberships m
+          JOIN teams t ON t.id = m.team_id
+          WHERE m.athlete_id = a.id AND t.club_id = :clubId
+        ) OR EXISTS (
+          SELECT 1 FROM athlete_tests at
+          JOIN test_sessions s ON s.id = at.test_session_id
+          WHERE at.athlete_id = a.id AND s.club_id = :clubId
+        ) AS in_club
+      FROM athletes a
+      WHERE ${nameSql("a.full_name")} = ${nameSql(":name")}
+        AND a.birth_year = :birthYear
+    `,
+    { replacements: { name, birthYear, clubId }, type: QueryTypes.SELECT, transaction },
+  );
+}
+
+async function ensureMembership(
+  athleteId: string,
+  teamId: string,
+  startDate: string,
+  transaction: Transaction,
+) {
+  const memberships = await sequelize.query<{ id: string; team_id: string; start_date: string; end_date: string | null }>(
+    "SELECT id, team_id, start_date::text, end_date::text FROM athlete_team_memberships WHERE athlete_id = :athleteId",
+    { replacements: { athleteId }, type: QueryTypes.SELECT, transaction },
+  );
+
+  if (!memberships.some((m) => m.team_id === teamId && m.start_date === startDate)) {
+    const id = randomUUID();
+    await sequelize.query(
+      `INSERT INTO athlete_team_memberships (id, athlete_id, team_id, start_date, end_date, source, created_at, updated_at)
+       VALUES (:id, :athleteId, :teamId, :startDate, NULL, 'historical_import', now(), now())`,
+      { replacements: { id, athleteId, teamId, startDate }, transaction },
+    );
+    memberships.push({ id, team_id: teamId, start_date: startDate, end_date: null });
+  }
+
+  const changes = computeMembershipEndDates(
+    memberships.map((m) => ({ id: m.id, startDate: m.start_date, endDate: m.end_date })),
+  );
+  for (const change of changes) {
+    await sequelize.query(
+      "UPDATE athlete_team_memberships SET end_date = :endDate, updated_at = now() WHERE id = :id",
+      { replacements: change, transaction },
+    );
+  }
+}
+
+async function importRow(
+  row: ParsedHistoricalRow,
+  mapping: ResolvedFolderMapping,
+  clubId: string,
+  filePath: string,
+  rowNumber: number,
+  report: ImportReport,
+  transaction: Transaction,
+) {
+  const fullName = normalizeAthleteName(row.athleteName!);
+  const birthYear = row.birthYear!;
+
+  // A row counts as already imported when the name matches, or, for names corrected after
+  // import, when at least three measured values are identical for the same club, date and year.
+  const hasFingerprint = metricCount(row) >= 3;
+  const [existingRow] = await sequelize.query<{ id: string }>(
+    `SELECT id FROM historical_athlete_data
+     WHERE club_id = :clubId AND test_date = :testDate AND birth_year = :birthYear
+       AND (
+         ${nameSql("full_name")} = ${nameSql(":fullName")}
+         OR (:hasFingerprint
+           AND height IS NOT DISTINCT FROM :height
+           AND weight IS NOT DISTINCT FROM :weight
+           AND flexibility IS NOT DISTINCT FROM :flexibility
+           AND sprint_30m IS NOT DISTINCT FROM :sprint30
+           AND agility IS NOT DISTINCT FROM :agility
+           AND vertical_jump IS NOT DISTINCT FROM :verticalJump)
+       )
+     LIMIT 1`,
+    {
+      replacements: {
+        clubId,
+        testDate: mapping.testDate,
+        birthYear,
+        fullName,
+        hasFingerprint,
+        height: row.height ?? null,
+        weight: row.weight ?? null,
+        flexibility: row.flexibility ?? null,
+        sprint30: row.sprint30 ?? null,
+        agility: row.agility ?? null,
+        verticalJump: row.verticalJump ?? null,
+      },
+      type: QueryTypes.SELECT,
+      transaction,
+    },
+  );
+  if (existingRow) {
+    report.alreadyImportedRows += 1;
+    return;
+  }
+
+  const candidates = await findAthleteCandidates(fullName, birthYear, clubId, transaction);
+  const sameClub = candidates.filter((candidate) => candidate.in_club);
+
+  if (sameClub.length > 1) {
+    report.ambiguousRows.push({
+      filePath,
+      rowNumber,
+      reason: `${athleteNameKey(fullName)} (${birthYear}) bu kulüpte birden fazla sporcuyla eşleşiyor`,
+    });
+    return;
+  }
+
+  let athleteId: string;
+  if (sameClub.length === 1) {
+    athleteId = sameClub[0].id;
+    report.linkedExistingAthletes += 1;
+  } else {
+    athleteId = randomUUID();
+    await sequelize.query(
+      `INSERT INTO athletes (id, full_name, birth_year, gender, created_at, updated_at)
+       VALUES (:athleteId, :fullName, :birthYear, :gender, now(), now())`,
+      {
+        replacements: {
+          athleteId,
+          fullName,
+          birthYear,
+          gender: row.gender ? normalizeGender(row.gender) : mapping.defaultGender,
+        },
+        transaction,
+      },
+    );
+    report.createdAthletes += 1;
+
+    for (const other of candidates) {
+      await sequelize.query(
+        `INSERT INTO identity_merge_candidates (id, athlete_id_a, athlete_id_b, reason, match_score, status, created_at, updated_at)
+         VALUES (:id, :a, :b, :reason, 100, 'pending', now(), now())
+         ON CONFLICT (athlete_id_a, athlete_id_b) DO NOTHING`,
+        {
+          replacements: {
+            id: randomUUID(),
+            a: other.id,
+            b: athleteId,
+            reason: `Aynı ad-soyad ve doğum yılı başka kulüpte mevcut; ${mapping.club} importu (${path.basename(filePath)})`,
+          },
+          transaction,
+        },
+      );
+      report.mergeCandidates += 1;
+    }
+  }
+
+  const teamId = await findOrCreateTeam(clubId, mapping.team, report, transaction);
+  await ensureMembership(athleteId, teamId, mapping.testDate, transaction);
+
+  await sequelize.query(
+    `INSERT INTO historical_athlete_data (
+       id, full_name, club_name, club_id, team_id, athlete_id, test_date, test_date_estimated,
+       country_code, country_name, birth_year, gender, height, weight, bmi, flexibility,
+       sprint_30m, sprint_30m_second, agility, vertical_jump, pass_count, ffmi, fatigue_index,
+       created_at, updated_at
+     ) VALUES (
+       :id, :fullName, :clubName, :clubId, :teamId, :athleteId, :testDate, :testDateEstimated,
+       'TR', 'Türkiye', :birthYear, :gender, :height, :weight, :bmi, :flexibility,
+       :sprint30, :sprint30Second, :agility, :verticalJump, :passCount, :ffmi, :fatigueIndex,
+       now(), now()
+     )`,
+    {
+      replacements: {
+        id: randomUUID(),
+        fullName,
+        clubName: mapping.club,
+        clubId,
+        teamId,
+        athleteId,
+        testDate: mapping.testDate,
+        testDateEstimated: mapping.testDateEstimated,
+        birthYear,
+        gender: row.gender ? normalizeGender(row.gender) : mapping.defaultGender,
+        height: row.height ?? null,
+        weight: row.weight ?? null,
+        bmi: row.bmi ?? null,
+        flexibility: row.flexibility ?? null,
+        sprint30: row.sprint30 ?? null,
+        sprint30Second: row.sprint30_2 ?? null,
+        agility: row.agility ?? null,
+        verticalJump: row.verticalJump ?? null,
+        passCount: row.passCount ?? null,
+        ffmi: row.ffmi ?? null,
+        fatigueIndex: row.fatigueIndex ?? null,
+      },
+      transaction,
+    },
+  );
+  report.importedRows += 1;
 }
 
 async function importWorkbookFile(
   filePath: string,
+  options: CliOptions,
+  entries: FolderMappingEntry[],
   report: ImportReport,
-  duplicateHashes: Map<string, DuplicateCandidateEntry>,
 ) {
+  const relativePath = relativeToRoot(options.folder, filePath);
+  const mapping = resolveFolderMapping(relativePath, entries);
+
+  if (!mapping) {
+    report.unmappedFiles.push(relativePath);
+    return;
+  }
+
+  const clubId = await findClubId(mapping.club);
+  if (!clubId) {
+    if (!report.unknownClubs.includes(mapping.club)) report.unknownClubs.push(mapping.club);
+    report.skippedFiles.push(relativePath);
+    return;
+  }
+
   const workbook = XLSX.readFile(filePath, { cellDates: true });
-  const clubName = extractClubNameFromFilePath(filePath, TEST_FOLDER);
-  const inferredGender = filePath
-    .toLocaleUpperCase("tr-TR")
-    .includes("VOLEYBOL")
-    ? ATHLETE_GENDERS.FEMALE
-    : ATHLETE_GENDERS.MALE;
+  const transaction = await sequelize.transaction();
   let importedAnySheet = false;
 
-  for (const sheetName of workbook.SheetNames) {
-    const worksheet = workbook.Sheets[sheetName];
-    const rawRows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(worksheet);
-    const parsedRows = rawRows.map(mapExcelRow);
+  try {
+    for (const sheetName of workbook.SheetNames) {
+      const rawRows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+      const parsedRows = rawRows.map(mapExcelRow);
+      if (!isLikelyHistoricalTestSheet(parsedRows)) continue;
+      importedAnySheet = true;
 
-    if (!isLikelyHistoricalTestSheet(parsedRows)) {
-      continue;
+      for (let index = 0; index < parsedRows.length; index++) {
+        const row = parsedRows[index];
+        const rowNumber = index + 2;
+
+        if (!row.athleteName || !row.birthYear || metricCount(row) < 1) {
+          report.invalidRows.push({
+            filePath: relativePath,
+            sheetName,
+            rowNumber,
+            reason: "Eksik sporcu adı, doğum yılı veya metrik verisi",
+          });
+          continue;
+        }
+
+        await importRow(row, mapping, clubId, relativePath, rowNumber, report, transaction);
+      }
     }
 
-    importedAnySheet = true;
-
-    for (let index = 0; index < parsedRows.length; index++) {
-      const row = parsedRows[index];
-      const rowNumber = index + 2;
-
-      if (!isImportableRow(row)) {
-        report.invalidRows.push({
-          filePath,
-          sheetName,
-          rowNumber,
-          reason: "Eksik sporcu adı, doğum yılı veya metrik verisi",
-        });
-        continue;
-      }
-
-      const duplicateHash = buildDuplicateCandidateHash(filePath, sheetName, row);
-      const existingDuplicate = duplicateHashes.get(duplicateHash);
-
-      if (existingDuplicate) {
-        report.duplicateCandidates.push({
-          filePath,
-          sheetName,
-          rowNumber,
-          athleteName: row.athleteName,
-          birthYear: row.birthYear,
-          hash: duplicateHash,
-        });
-      } else {
-        duplicateHashes.set(duplicateHash, {
-          filePath,
-          sheetName,
-          rowNumber,
-          athleteName: row.athleteName,
-          birthYear: row.birthYear,
-          hash: duplicateHash,
-        });
-      }
-
-      if (!DRY_RUN) {
-        await HistoricalAthleteData.create({
-          full_name: row.athleteName?.trim() || null,
-          club_name: clubName,
-          country_code: "TR",
-          country_name: "Türkiye",
-          birth_year: row.birthYear!,
-          gender: row.gender ? normalizeGender(row.gender) : inferredGender,
-          height: row.height ?? null,
-          weight: row.weight ?? null,
-          bmi: row.bmi ?? null,
-          flexibility: row.flexibility ?? null,
-          sprint_30m: row.sprint30 ?? null,
-          sprint_30m_second: row.sprint30_2 ?? null,
-          agility: row.agility ?? null,
-          vertical_jump: row.verticalJump ?? null,
-          pass_count: row.passCount ?? null,
-          ffmi: row.ffmi ?? null,
-          fatigue_index: row.fatigueIndex ?? null,
-        });
-      }
-
-      report.importedRows += 1;
+    if (options.apply) {
+      await transaction.commit();
+    } else {
+      await transaction.rollback();
     }
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
   }
 
   if (importedAnySheet) {
     report.importedFiles += 1;
   } else {
-    report.skippedFiles.push(filePath);
+    report.skippedFiles.push(relativePath);
   }
-}
-
-async function writeReport(report: ImportReport) {
-  report.duplicateCandidateRows = report.duplicateCandidates.length;
-  await fs.mkdir(OUTPUT_DIR, { recursive: true });
-
-  const reportPath = path.join(OUTPUT_DIR, "historical-import-report.json");
-  await fs.writeFile(reportPath, JSON.stringify(report, null, 2), "utf8");
-
-  return reportPath;
 }
 
 async function main() {
+  const options = parseArgs(process.argv.slice(2));
+  const entries = validateFolderMapping(JSON.parse(await fs.readFile(options.mappingPath, "utf8")));
   const report: ImportReport = {
+    mode: options.apply ? "apply" : "dry-run",
     scannedFiles: 0,
     importedFiles: 0,
+    unmappedFiles: [],
+    unknownClubs: [],
     skippedFiles: [],
     importedRows: 0,
-    duplicateCandidateRows: 0,
+    alreadyImportedRows: 0,
+    linkedExistingAthletes: 0,
+    createdAthletes: 0,
+    createdTeams: [],
+    mergeCandidates: 0,
+    ambiguousRows: [],
     invalidRows: [],
-    duplicateCandidates: [],
   };
-  const duplicateHashes = new Map<string, DuplicateCandidateEntry>();
 
   try {
-    if (!DRY_RUN) {
-      await sequelize.authenticate();
-      await ensureHistoricalTableColumns();
-      if (TRUNCATE_FIRST) {
-        await sequelize.query("TRUNCATE TABLE historical_athlete_data RESTART IDENTITY");
-      }
+    await sequelize.authenticate();
+
+    const files = (await walkExcelFiles(options.folder)).filter((filePath) => !shouldSkipImportFile(filePath));
+    report.scannedFiles = files.length;
+
+    for (const filePath of files) {
+      await importWorkbookFile(filePath, options, entries, report);
     }
 
-    const allFiles = await walkFiles(TEST_FOLDER);
-    const importableFiles = allFiles.filter((filePath) => !shouldSkipImportFile(filePath));
-    report.scannedFiles = importableFiles.length;
+    await fs.mkdir(OUTPUT_DIR, { recursive: true });
+    const reportPath = path.join(OUTPUT_DIR, `import-report-${report.mode}.json`);
+    await fs.writeFile(reportPath, JSON.stringify(report, null, 2), "utf8");
 
-    for (const filePath of importableFiles) {
-      await importWorkbookFile(filePath, report, duplicateHashes);
-    }
-
-    const reportPath = await writeReport(report);
-    console.log(`Import completed. Report saved to ${reportPath}`);
-    console.log(
-      `${DRY_RUN ? "Scanned" : "Imported"} ${report.importedRows} rows from ${report.importedFiles} files. Duplicate candidates: ${report.duplicateCandidates.length}.`,
-    );
-  } catch (error) {
-    console.error("TEST folder import failed:", error);
-    process.exitCode = 1;
+    console.log(`${options.apply ? "Yazıldı" : "Deneme (hiçbir şey yazılmadı)"}: ${report.importedRows} satır, ${report.createdAthletes} yeni sporcu, ${report.linkedExistingAthletes} mevcut sporcuya bağlandı, ${report.alreadyImportedRows} zaten vardı.`);
+    console.log(`Eşlemesiz dosya: ${report.unmappedFiles.length}, bilinmeyen kulüp: ${report.unknownClubs.length}, belirsiz satır: ${report.ambiguousRows.length}, birleştirme adayı: ${report.mergeCandidates}.`);
+    console.log(`Rapor: ${reportPath}`);
   } finally {
-    if (!DRY_RUN) {
-      await sequelize.close();
-    }
+    await sequelize.close();
   }
 }
 
-main();
+main().catch((error) => {
+  console.error("TEST folder import failed:", error instanceof Error ? error.message : error);
+  process.exitCode = 1;
+});

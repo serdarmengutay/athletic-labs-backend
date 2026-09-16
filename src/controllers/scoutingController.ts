@@ -231,6 +231,12 @@ function getBaseDatasetSql() {
     INNER JOIN athletes a ON a.id = at.athlete_id
     INNER JOIN measurements m ON m.athlete_test_id = at.id
     LEFT JOIN test_sessions ts ON ts.id = at.test_session_id
+    -- Teste gelmeyen sporcuların boş ölçüm satırı listede görünmez.
+    WHERE COALESCE(
+      m.height, m.weight, m.flexibility, m.sprint_30m, m.sprint_30m_second,
+      m.agility, m.vertical_jump, m.handgrip, m.ffmi
+    ) IS NOT NULL
+      OR m.pass_count IS NOT NULL
 
     UNION ALL
 

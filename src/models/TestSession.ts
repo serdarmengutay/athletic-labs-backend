@@ -5,6 +5,7 @@ import sequelize from "../config/database";
 interface TestSessionAttributes {
   id: string;
   club_name: string;
+  club_id: string | null;
   club_responsible_name: string;
   club_responsible_email: string | null;
   club_responsible_phone: string | null;
@@ -23,6 +24,7 @@ interface TestSessionCreationAttributes
   extends Optional<
     TestSessionAttributes,
     | "id"
+    | "club_id"
     | "club_responsible_email"
     | "club_responsible_phone"
     | "vald_enabled"
@@ -39,6 +41,7 @@ class TestSession
 {
   public id!: string;
   public club_name!: string;
+  public club_id!: string | null;
   public club_responsible_name!: string;
   public club_responsible_email!: string | null;
   public club_responsible_phone!: string | null;
@@ -63,6 +66,10 @@ TestSession.init(
     club_name: {
       type: DataTypes.STRING(255),
       allowNull: false,
+    },
+    club_id: {
+      type: DataTypes.UUID,
+      allowNull: true,
     },
     club_responsible_name: {
       type: DataTypes.STRING(255),
