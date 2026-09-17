@@ -44,3 +44,22 @@ Emin değilsen, ilgili dosyayı okumadan varsayımla ilerleme — sor ya da dosy
 | athletic-labs-website | athleticlabs.com.tr | Herkes (tanıtım) | Mevcut statik site. Kısa vadede sadece "Giriş Yap" linki eklenecek; diğer tüm projeler (backend, panel, app, scouting) tamamlandıktan sonra site **baştan sona yeniden yapılacak** |
 
 Tek backend, çoklu frontend. Domain/iş mantığı sadece backend'de yaşar, frontend'ler sadece görüntüler/gönderir.
+
+## 4. Dal ve PR yapısı
+
+Köklü yenileme (kimlik/TCKN, RBAC, kulüp-takım hiyerarşisi, portal, scouting) tek tek main'e değil, **`dev` dalında** toplanır. Bu düzen **tüm repolarda** (backend, panel/frontend, app, scouting, website) aynıdır.
+
+```
+main  ← yayındaki sürüm (Render/Vercel buradan deploy eder)
+ └── dev  ← tüm yenilemenin toplandığı dal
+      ├── feat/<konu>   ← görev bazlı dallar, PR'ı dev'e açılır
+      └── fix/<konu>
+```
+
+1. **Görev dalı her zaman `dev`'den açılır**, `main`'den değil: `git checkout dev && git pull && git checkout -b feat/<konu>`.
+2. **PR'ın hedefi (base) her zaman `dev`'dir.** Ajan, hedefi `main` olan PR açmaz.
+3. **`main`'e yalnızca sürüm çıkarken**, tüm feature'lar tamamlandıktan sonra `dev` → `main` PR'ı ile gidilir. Bu PR'ı insan açar/onaylar.
+4. **`main`'e doğrudan push edilmez.** Tek istisna, canlı sistemi ayakta tutan acil düzeltmelerdir; bu durumda düzeltme sonradan `dev`'e de taşınır.
+5. **Deploy etkisi:** `main`'e birleştirme canlıya çıkar; backend'de ayrıca `render.yaml` gereği `npm run db:migrate` çalışır. Saha ekibi paneli ölçüm günlerinde kullandığı için `main` birleştirmeleri ölçüm olmayan bir güne planlanır (bkz. kural 1.6).
+6. Migration'lar `dev`'de birikir; prod'a uygulanma sırası ve zamanı insanla kararlaştırılır.
+7. Backend ile frontend'i birlikte etkileyen bir değişiklikte (yeni uç, değişen alan adı) iki reponun PR'ları aynı anda `dev`'e alınır; panel, `dev` backend'iyle çalışır durumda tutulur.
