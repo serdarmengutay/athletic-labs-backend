@@ -9,6 +9,7 @@ import HistoricalAthleteData from "./HistoricalAthleteData";
 import XOneReportImport from "./XOneReportImport";
 import YoujiuPushLog from "./YoujiuPushLog";
 import ValdResultImport from "./ValdResultImport";
+import CalendarNote from "./CalendarNote";
 
 // TODO MVP: Commented out models - re-enable after MVP
 /*
@@ -79,6 +80,15 @@ AthleteTest.hasMany(ValdResultImport, {
 ValdResultImport.belongsTo(AthleteTest, {
   foreignKey: "athlete_test_id",
   as: "athleteTest",
+});
+
+TestSession.hasMany(CalendarNote, {
+  foreignKey: "test_session_id",
+  as: "calendarNotes",
+});
+CalendarNote.belongsTo(TestSession, {
+  foreignKey: "test_session_id",
+  as: "testSession",
 });
 
 // HistoricalAthleteData is standalone - no associations needed
@@ -189,6 +199,7 @@ export {
   XOneReportImport,
   YoujiuPushLog,
   ValdResultImport,
+  CalendarNote,
   // TODO MVP: Commented out exports
   // Club,
   // TestResult,
