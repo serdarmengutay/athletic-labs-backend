@@ -30,6 +30,7 @@ import excelRoutes from "./routes/excel";
 import coachRoutes from "./routes/coaches";
 import youjiuPushRoutes from "./routes/youjiuPush";
 import publicRegistrationRoutes from "./routes/publicRegistrations";
+import calendarNoteRoutes from "./routes/calendarNotes";
 
 const app = express();
 const PORT = process.env.PORT || 5017;
@@ -118,6 +119,8 @@ app.use("/api/athlete-tests", athleteTestRoutes);
 app.use("/api/historical-athletes", historicalAthletesRoutes);
 app.use("/api/historical-tests", historicalTestsRoutes);
 app.use("/api/scouting", scoutingRoutes);
+// Panel (iç ekip) takvim notları
+app.use("/api/internal/calendar-notes", calendarNoteRoutes);
 // Legacy routes (will be deprecated)
 app.use("/api/clubs", clubRoutes);
 app.use("/api/athletes", athleteRoutes);
