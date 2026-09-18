@@ -38,3 +38,11 @@ Bir sporcu A kulübünden B kulübüne geçtiğinde, **B kulübünün antrenör�
 - Gerekçe: ürünün çekirdeği kariyer boyu gelişim takibi. Sporcu kulüp değiştirdiğinde geçmişi sıfırlanırsa gelişim grafiği anlamını yitirir.
 - Sporcu kapsamdan çıkınca (üyeliği kapanınca, yani başka kulüpte test olunca) eski antrenör o sporcuyu **artık görmez** — geçmişe dönük erişim açık kalmaz.
 - Takım ortalaması/karşılaştırma raporlarında sporcu yalnızca **o testin yapıldığı** takıma sayılır; eski kulüpteki testi yeni takımın ortalamasına karışmaz.
+
+## TCKN saklama kararı (karar: 2026-09-18, insan onaylı)
+
+- TCKN açık ya da şifreli olarak **hiçbir yerde saklanmaz.** Sadece `athletes.tc_no_hash` = HMAC-SHA256(`TCKN_HASH_SECRET`, TCKN) tutulur (bkz. `src/services/identity/tcknService.ts`).
+- Bu anonimleştirme değil, **takma adlandırmadır**: geçerli TCKN uzayı ~900 milyon olduğu için anahtarı bilen biri tüm hash'leri dakikalar içinde TCKN'ye geri çevirebilir. KVKK metinleri "geri elde edilemez" demez.
+- Bu yüzden `TCKN_HASH_SECRET` hem eşleştirmenin (yıllar sonra aynı sporcuyu bulma) hem de TCKN'lerin kilididir: asla değiştirilmez, veritabanıyla aynı yerde tutulmaz, repoya/loga/mesajlaşmaya yazılmaz. Prod anahtarı Render ortam değişkeninde ve şirket şifre yöneticisinde (+ çevrimdışı yedek) durur.
+- Resmî bir kurum sporcu listesi isterse varsayılan yol, kurumun gönderdiği TCKN listesini hash'leyip eşleştirmektir. Hash'lerden TCKN geri üretmek ancak hukuk onayıyla yapılır.
+- Gerçek kişi doğrulaması NVİ KPS kurumsal üyeliği üzerinden planlanıyor (ücretsiz KPSPublic servisi 2025-09-30'da kapandı); hukuk süreci devam ediyor.

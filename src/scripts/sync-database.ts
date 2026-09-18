@@ -7,6 +7,7 @@ import {
   HistoricalAthleteData,
 } from "../models";
 import { ATHLETE_GENDERS } from "../config/gender";
+import { assertDestructiveSyncAllowed } from "./destructiveSyncGuard";
 
 // TODO MVP: Commented out old models
 /*
@@ -23,11 +24,7 @@ import {
 
 const syncDatabase = async () => {
   try {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error(
-        "sync-database uses sequelize.sync({ force: true }) and is blocked in production. Use npm run db:migrate instead.",
-      );
-    }
+    assertDestructiveSyncAllowed("sync-database");
 
     console.log("🔄 Database bağlantısı test ediliyor...");
     await sequelize.authenticate();
