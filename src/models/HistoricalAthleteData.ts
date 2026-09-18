@@ -22,6 +22,11 @@ interface HistoricalAthleteDataAttributes {
   pass_count: number | null;
   ffmi: number | null;
   fatigue_index: number | null;
+  athlete_id: string | null;
+  club_id: string | null;
+  team_id: string | null;
+  test_date: string | null;
+  test_date_estimated: boolean | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -46,6 +51,11 @@ interface HistoricalAthleteDataCreationAttributes
     | "pass_count"
     | "ffmi"
     | "fatigue_index"
+    | "athlete_id"
+    | "club_id"
+    | "team_id"
+    | "test_date"
+    | "test_date_estimated"
     | "created_at"
     | "updated_at"
   > {}
@@ -75,6 +85,11 @@ class HistoricalAthleteData
   public pass_count!: number | null;
   public ffmi!: number | null;
   public fatigue_index!: number | null;
+  public athlete_id!: string | null;
+  public club_id!: string | null;
+  public team_id!: string | null;
+  public test_date!: string | null;
+  public test_date_estimated!: boolean | null;
   public readonly created_at!: Date;
   public readonly updated_at!: Date;
 }
@@ -158,6 +173,26 @@ HistoricalAthleteData.init(
     },
     fatigue_index: {
       type: DataTypes.DECIMAL(5, 2),
+      allowNull: true,
+    },
+    athlete_id: {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
+    club_id: {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
+    team_id: {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
+    test_date: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
+    },
+    test_date_estimated: {
+      type: DataTypes.BOOLEAN,
       allowNull: true,
     },
     created_at: {

@@ -1,6 +1,8 @@
 import { sequelize } from "../models";
+import { assertDestructiveSyncAllowed } from "./destructiveSyncGuard";
 
 const syncSchema = async () => {
+  assertDestructiveSyncAllowed("sync-schema");
   try {
     console.log("Checking database connection...");
     await sequelize.authenticate();

@@ -157,11 +157,8 @@ const startServer = async () => {
     await sequelize.authenticate();
     console.log("✅ Database connection established successfully.");
 
-    // Sync database (only in development)
-    if (process.env.NODE_ENV === "development") {
-      await sequelize.sync({ alter: true });
-      console.log("✅ Database synchronized.");
-    }
+    // Schema changes go through migrations only (npm run db:migrate).
+    // sync({ alter: true }) drops columns missing from the models, so it must not run here.
 
     app.listen(PORT, () => {
       console.log(`🚀 Server is running on port ${PORT}`);

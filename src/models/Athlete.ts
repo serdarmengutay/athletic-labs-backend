@@ -10,6 +10,7 @@ interface AthleteAttributes {
   birth_year: number;
   gender: AthleteGender;
   parent_phone: string | null;
+  tc_no_hash: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -17,7 +18,13 @@ interface AthleteAttributes {
 interface AthleteCreationAttributes
   extends Optional<
     AthleteAttributes,
-    "id" | "birth_date" | "gender" | "parent_phone" | "created_at" | "updated_at"
+    | "id"
+    | "birth_date"
+    | "gender"
+    | "parent_phone"
+    | "tc_no_hash"
+    | "created_at"
+    | "updated_at"
   > {}
 
 class Athlete
@@ -30,8 +37,15 @@ class Athlete
   public birth_year!: number;
   public gender!: AthleteGender;
   public parent_phone!: string | null;
+  public tc_no_hash!: string | null;
   public readonly created_at!: Date;
   public readonly updated_at!: Date;
+
+  // tc_no_hash never leaves the backend, even when an instance was loaded with it.
+  public toJSON(): object {
+    const { tc_no_hash: _tcNoHash, ...values } = super.toJSON() as AthleteAttributes;
+    return values;
+  }
 }
 
 Athlete.init(
@@ -65,6 +79,11 @@ Athlete.init(
       type: DataTypes.STRING(20),
       allowNull: true,
     },
+    // HMAC-SHA256 of the TCKN (see services/identity/tcknService). Written only by the identity flow.
+    tc_no_hash: {
+      type: DataTypes.STRING(64),
+      allowNull: true,
+    },
     created_at: {
       type: DataTypes.DATE,
       allowNull: false,
@@ -80,6 +99,15 @@ Athlete.init(
     sequelize,
     tableName: "athletes",
     indexes: [{ fields: ["birth_year", "gender"] }],
+    // Excluded from every query (including includes) unless a scope explicitly asks for it.
+    defaultScope: {
+      attributes: { exclude: ["tc_no_hash"] },
+    },
+    scopes: {
+      withTcNoHash: {
+        attributes: { include: ["tc_no_hash"] },
+      },
+    },
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at",
