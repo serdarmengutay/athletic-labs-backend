@@ -6,33 +6,13 @@ import sequelize from "../../config/database";
 import { findAthleteIdByTcNoHash } from "./athleteIdentityRepository";
 import { hashTckn } from "./tcknService";
 import { generateSyntheticTckns } from "./syntheticTckn.testSupport";
+import { dbIntegrationSkipReason } from "./integrationTestGuard.testSupport";
 
 // Runs against a real database, so it is opt-in and refuses the production URL.
 // Every row it inserts is a dummy athlete named "Test Sentetik <run> <n>" and is deleted in after().
 // SENTETİK TEST VERİSİ, GERÇEK KİŞİYE AİT DEĞİLDİR.
 
-function databaseHost(url: string | undefined): string | null {
-  if (!url) {
-    return null;
-  }
-  try {
-    return new URL(url).hostname;
-  } catch {
-    return null;
-  }
-}
-
-const devHost = databaseHost(process.env.DATABASE_URL);
-const prodHost = databaseHost(process.env.PROD_DATABASE_URL);
-
-const skipReason =
-  process.env.RUN_DB_INTEGRATION_TESTS !== "1"
-    ? "RUN_DB_INTEGRATION_TESTS=1 değil"
-    : !devHost
-      ? "DATABASE_URL tanımlı değil"
-      : devHost === prodHost
-        ? "DATABASE_URL production veritabanını gösteriyor"
-        : false;
+const skipReason = dbIntegrationSkipReason();
 
 const RUN_ID = randomUUID().slice(0, 8);
 const [
@@ -46,16 +26,7 @@ const [
 ] = generateSyntheticTckns(7);
 
 const insertedIds: string[] = [];
-let athleteCountBefore = 0;
 let nextDummyNumber = 1;
-
-async function countAthletes(): Promise<number> {
-  const [row] = await sequelize.query<{ total: string }>(
-    "SELECT count(*) AS total FROM athletes",
-    { type: QueryTypes.SELECT },
-  );
-  return Number(row.total);
-}
 
 async function insertDummyAthlete(tcNoHash: string | null): Promise<string> {
   const id = randomUUID();
@@ -88,7 +59,6 @@ before(async () => {
   if (skipReason) {
     return;
   }
-  athleteCountBefore = await countAthletes();
   for (const tckn of [DUMMY_A, DUMMY_B, DUMMY_C, DUMMY_D, DUMMY_E]) {
     dummyRoster.set(tckn, await insertDummyAthlete(hashTckn(tckn)));
   }
@@ -107,7 +77,12 @@ after(async () => {
     await sequelize.query("DELETE FROM athletes WHERE full_name LIKE :pattern", {
       replacements: { pattern: `Test Sentetik ${RUN_ID} %` },
     });
-    assert.equal(await countAthletes(), athleteCountBefore);
+    // Only this run's rows are checked, so other test files running in parallel don't interfere.
+    const [left] = await sequelize.query<{ total: string }>(
+      "SELECT count(*) AS total FROM athletes WHERE full_name LIKE :pattern",
+      { replacements: { pattern: `Test Sentetik ${RUN_ID} %` }, type: QueryTypes.SELECT },
+    );
+    assert.equal(Number(left.total), 0);
   } finally {
     await sequelize.close();
   }
